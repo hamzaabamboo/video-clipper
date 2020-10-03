@@ -348,27 +348,27 @@ export default () => {
               />
               <button
                 className="rounded bg-blue-400 p-2"
-                onClick={() => setResScale(1080 / sizeRef.current.height)}
+                onClick={() => setResScale(1)}
               >
-                1080p
+                100%
               </button>
               <button
                 className="rounded bg-blue-400 p-2"
-                onClick={() => setResScale(720 / sizeRef.current.height)}
+                onClick={() => setResScale(0.75)}
               >
-                720p
+                75%
               </button>
               <button
                 className="rounded bg-blue-400 p-2"
-                onClick={() => setResScale(480 / sizeRef.current.height)}
+                onClick={() => setResScale(0.5)}
               >
-                480p
+                50%
               </button>
               <button
                 className="rounded bg-blue-400 p-2"
-                onClick={() => setResScale(360 / sizeRef.current.height)}
+                onClick={() => setResScale(0.25)}
               >
-                360p
+                25%
               </button>
             </div>
           </div>

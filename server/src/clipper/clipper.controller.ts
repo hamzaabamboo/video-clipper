@@ -128,7 +128,11 @@ export class ClipperController implements OnApplicationShutdown {
           await mkdirp(path.join(__dirname, '../../../files/tmp'));
           if (
             !existsSync(
-              path.join(__dirname, '../../../files', `tmp/tmp-${filename}.mp4`),
+              path.join(
+                __dirname,
+                '../../../files',
+                `tmp/tmp-${filename}-${scale}.mp4`,
+              ),
             )
           )
             await new Promise((resolve, reject) =>
@@ -137,7 +141,7 @@ export class ClipperController implements OnApplicationShutdown {
                   path.join(
                     __dirname,
                     '../../../files',
-                    `tmp/tmp-${filename}.mp4`,
+                    `tmp/tmp-${filename}-${scale}.mp4`,
                   ),
                 )
                 .on('progress', progress => {
@@ -155,7 +159,11 @@ export class ClipperController implements OnApplicationShutdown {
 
           this.logger.verbose(`Creating GIF for ${info.videoDetails.title}`);
           resStream = ffmpeg(
-            path.join(__dirname, '../../../files', `tmp/tmp-${filename}.mp4`),
+            path.join(
+              __dirname,
+              '../../../files',
+              `tmp/tmp-${filename}-${scale}.mp4`,
+            ),
           )
             .format('gif')
             .outputFPS(Number(fps))
