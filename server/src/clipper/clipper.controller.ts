@@ -49,6 +49,10 @@ export class ClipperController implements OnApplicationShutdown {
     @Query('type') type: string,
     @Query('fps') fps = 30,
     @Query('scale') scale = 1,
+    @Query('x') x = 0,
+    @Query('y') y = 0,
+    @Query('width') width = 1,
+    @Query('height') height = 1,
     @Res() res: Response,
   ) {
     if (!url) throw new HttpException('Url is not supplied', 400);
@@ -63,15 +67,11 @@ export class ClipperController implements OnApplicationShutdown {
       return new HttpException('Video clip too long', 400);
     }
     try {
-      const info = await ytdl.getInfo(vid);
-      const vidStream =
-        !type || type === 'gif'
-          ? ytdl(vid, {
-              quality: 18,
-            })
-          : ytdl(vid, {
-              quality: 'highest',
-            });
+      const options = {
+        quality: !type || type === 'gif' ? 18 : 'highest',
+      };
+      const info = await ytdl.getInfo(vid, options);
+      const vidStream = ytdl(vid, options);
 
       // vidStream.on('progress', (_, downloaded, total) => {
       //   this.logger.verbose(
@@ -81,10 +81,25 @@ export class ClipperController implements OnApplicationShutdown {
       let resStream = ffmpeg(vidStream);
 
       resStream = resStream.setDuration(dur);
-      resStream = resStream.setSize(`${Math.floor((scale || 0.5) * 100)}%`);
       // console.log(vid, Number(start ?? 0), end, dur);
       if (Number(start ?? 0) > 0)
         resStream = resStream.seekInput(Number(start ?? 0));
+
+      if (
+        Number(x) >= 0 &&
+        Number(y) >= 0 &&
+        Number(width) > 0 &&
+        Number(height) > 0
+      ) {
+        const h = info.formats[0].height;
+        const w = info.formats[0].width;
+        console.log(`crop=${width * w}:${height * h}:${x * w}:${y * h}`);
+        resStream = resStream.videoFilters(
+          `crop=${width * w}:${height * h}:${x * w}:${y * h}`,
+        );
+      }
+
+      resStream = resStream.setSize(`${Math.floor((scale || 0.5) * 100)}%`);
 
       let filename = `${info.videoDetails.title}_${start}_${end}`;
 
@@ -125,25 +140,12 @@ export class ClipperController implements OnApplicationShutdown {
           this.logger.verbose(
             `Saving temp file for ${info.videoDetails.title}`,
           );
+          const tmpname = `tmp/tmp-${filename}-${scale}-${x}-${y}-${width}-${height}.mp4`;
           await mkdirp(path.join(__dirname, '../../../files/tmp'));
-          if (
-            !existsSync(
-              path.join(
-                __dirname,
-                '../../../files',
-                `tmp/tmp-${filename}-${scale}.mp4`,
-              ),
-            )
-          )
+          if (!existsSync(path.join(__dirname, '../../../files', tmpname)))
             await new Promise((resolve, reject) =>
               resStream
-                .saveToFile(
-                  path.join(
-                    __dirname,
-                    '../../../files',
-                    `tmp/tmp-${filename}-${scale}.mp4`,
-                  ),
-                )
+                .saveToFile(path.join(__dirname, '../../../files', tmpname))
                 .on('progress', progress => {
                   this.logger.verbose(`[download] ${JSON.stringify(progress)}`);
                 })
@@ -158,13 +160,7 @@ export class ClipperController implements OnApplicationShutdown {
             );
 
           this.logger.verbose(`Creating GIF for ${info.videoDetails.title}`);
-          resStream = ffmpeg(
-            path.join(
-              __dirname,
-              '../../../files',
-              `tmp/tmp-${filename}-${scale}.mp4`,
-            ),
-          )
+          resStream = ffmpeg(path.join(__dirname, '../../../files', tmpname))
             .format('gif')
             .outputFPS(Number(fps))
             .videoFilter(

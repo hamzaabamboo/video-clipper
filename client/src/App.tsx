@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import Slider, { Range } from "rc-slider";
+import { Range } from "rc-slider";
+import { Slider } from "./components/Slider";
 import axios from "axios";
 import qs from "querystring";
 import "./styles/tailwind.css";
@@ -9,6 +10,15 @@ const calculateFps = (w: number, h: number, fps: number, length: number) => {
   return (4 * (w * h * fps * length)) / 8;
 };
 
+interface Coordinate {
+  x: number;
+  y: number;
+}
+
+interface Dimension {
+  width: number;
+  height: number;
+}
 export default () => {
   const [url, setUrl] = useState<string>(
     "https://www.youtube.com/watch?v=ebSce4xUjo0"
@@ -16,19 +26,43 @@ export default () => {
   const [duration, setDuration] = useState<number>(0);
   const [progress, setProgress] = useState<number>(0);
   const [volume, setVolume] = useState<number>(0);
-  const [video, setVideoSrc] = useState<string>();
+  const [video, setVideoSrc] = useState<string>(
+    "https://r3---sn-w5nuxa-c33ey.googlevideo.com/videoplayback?expire=1601817223&ei=J3Z5X8f0NJPMvAS_37RA&ip=183.89.153.16&id=o-APKsPS5VT3uFTUUZk0TfzcEqQDfqSl8aID0Sx8_ZAont&itag=18&source=youtube&requiressl=yes&mh=dy&mm=31%2C26&mn=sn-w5nuxa-c33ey%2Csn-npoeenez&ms=au%2Conr&mv=m&mvi=3&pl=17&initcwndbps=1292500&vprv=1&mime=video%2Fmp4&gir=yes&clen=45410516&ratebypass=yes&dur=519.894&lmt=1601150325762198&mt=1601795428&fvip=3&fexp=23915654&c=WEB&txp=5530422&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cgir%2Cclen%2Cratebypass%2Cdur%2Clmt&sig=AOq0QJ8wRQIhAPkWbt9_LdRKwjFdlDt1I1SNMQa2dE09HiUe7jqyD-qRAiA6GalbHKRZKM5Qm9bg50v9o-nN4-5W7wIc_PFC3sEIEQ%3D%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIgDUsQrowxB05bdp4-meF59sHRY2Foyrd9hHwr1id9nhsCIQDgEiYi5gApC_RjCt7VSMqAve5fFvLhsss_a8RwiBtMLw%3D%3D"
+  );
   const [clip, setClip] = useState<[number, number]>([0, 0]);
   const [fps, setFps] = useState<number>(30);
   const [loop, setLoop] = useState<boolean>(true);
   const [res, setRes] = useState<string>("");
 
+  const [dimension, setDimensions] = useState<Dimension>({
+    width: 1,
+    height: 1,
+  });
+  const cropPositionRef = useRef<Coordinate>({
+    x: 0,
+    y: 0,
+  });
+  const cropDimensionRef = useRef<Dimension>({
+    width: 0.5,
+    height: 0.5,
+  });
+
+  const [cropDimension, setCropDimesion] = useState<Dimension>({
+    width: 0.5,
+    height: 0.5,
+  });
+
+  const [cropPosition, setCropPosition] = useState<Coordinate>({
+    x: 0,
+    y: 0,
+  });
+
   const [resScale, setResScale] = useState<number>(1);
   const [resFps, setResFps] = useState<number>(30);
+
   const videoRef = useRef<HTMLVideoElement>(null);
-  const sizeRef = useRef<{ width: number; height: number }>({
-    width: 0,
-    height: 0,
-  });
+  const playerRef = useRef<HTMLDivElement>(null);
+  const cropperRef = useRef<HTMLDivElement>(null);
   const dlUrl = useMemo(() => {
     return (
       url &&
@@ -40,17 +74,21 @@ export default () => {
           end: clip[1],
           fps: resFps,
           scale: resScale,
+          ...cropDimension,
+          ...cropPosition,
         })
     );
-  }, [url, clip, resFps, resScale]);
+  }, [url, clip, resFps, resScale, cropDimension, cropPosition]);
+
   const size = useMemo(() => {
     return calculateFps(
-      sizeRef.current.width * resScale,
-      sizeRef.current.height * resScale,
+      dimension.width * resScale,
+      dimension.height * resScale,
       resFps,
       clip[1] - clip[0]
     );
   }, [clip, resFps, resScale]);
+
   const seekingRef = useRef(false);
 
   const updateProgress = (time: number) => {
@@ -80,24 +118,6 @@ export default () => {
   }, [progress]);
 
   useEffect(() => {
-    const updateVolume = (e) => {
-      setVolume(e.target.volume * 100);
-    };
-    videoRef.current?.addEventListener("volumechange", updateVolume);
-
-    const updateTime = (e) => {
-      setProgress(e.target.currentTime);
-    };
-    videoRef.current?.addEventListener("timeupdate", updateTime);
-
-    const checkBounds = (e) => {
-      if (e.target.currentTime >= clip[1]) {
-        setProgress(clip[0]);
-        e.target.currentTime = clip[0];
-      }
-    };
-    videoRef.current?.addEventListener("play", updateTime);
-
     const toggle = (e) => {
       if (e.key === " ") {
         if (videoRef.current?.paused) videoRef.current?.play();
@@ -106,13 +126,9 @@ export default () => {
         e.stopImmediatePropagation();
       }
     };
-    const _window = window;
-    _window?.addEventListener("keypress", toggle);
+    window.addEventListener("keypress", toggle);
     return () => {
-      videoRef.current?.removeEventListener("volumechange", updateVolume);
-      videoRef.current?.removeEventListener("timeupdate", updateTime);
-      videoRef.current?.removeEventListener("play", checkBounds);
-      _window?.removeEventListener("keypress", toggle);
+      window.removeEventListener("keypress", toggle);
     };
   }, [video]);
 
@@ -130,10 +146,13 @@ export default () => {
       setFps(data.fps);
       setDuration(Number(data.approxDurationMs) / 1000);
       setClip([0, Number(data.approxDurationMs) / 1000]);
-      sizeRef.current = {
+      setDimensions({
         width: bestVideo.width,
         height: bestVideo.height,
-      };
+      });
+      cropPositionRef.current = { x: 0, y: 0 };
+      cropDimensionRef.current = { width: 1, height: 1 };
+
       setVolume(50);
     } catch {
       setVideoSrc("");
@@ -149,8 +168,126 @@ export default () => {
           end: clip[1],
           fps: resFps,
           scale: resScale,
+          ...cropDimension,
+          ...cropPosition,
         })
     );
+  };
+
+  const setCrop = () => {
+    setCropDimesion(cropDimensionRef.current);
+    setCropPosition(cropPositionRef.current);
+  };
+
+  const handleDrag = (type: "pos" | "size" | "all") => (
+    event: React.MouseEvent<HTMLDivElement, MouseEvent>
+  ) => {
+    const target = event.nativeEvent.target as HTMLDivElement;
+    let shiftX =
+      event.nativeEvent.clientX - target.getBoundingClientRect().left;
+    let shiftY = event.nativeEvent.clientY - target.getBoundingClientRect().top;
+    event.nativeEvent.stopPropagation();
+    event.nativeEvent.preventDefault();
+    console.log(target.getBoundingClientRect());
+    const t = playerRef.current as HTMLDivElement;
+
+    const rect = t.getBoundingClientRect();
+
+    function onMouseEnter(event: MouseEvent) {
+      event.stopPropagation();
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+
+    function onMouseMove(event: MouseEvent) {
+      if (type === "pos") {
+        const x2 =
+          cropPositionRef.current.x +
+          rect.left * cropDimensionRef.current.width;
+        const y2 =
+          cropPositionRef.current.y +
+          rect.top * cropDimensionRef.current.height;
+        const xOff = event.clientX - shiftX - rect.left;
+        const yOff = event.clientY - shiftY - rect.top;
+
+        const cropper = cropperRef.current as HTMLDivElement;
+
+        const xDim = (x2 - xOff) / rect.width;
+        const yDim = (y2 - yOff) / rect.height;
+
+        console.log(x2, xOff, y2, yOff);
+        if (yOff > 0 && yOff < y2) {
+          cropDimensionRef.current.height = yDim / rect.height;
+          cropper.style.height = yDim * 100 + "%";
+          cropPositionRef.current.y = yOff / rect.height;
+          cropper.style.top = yOff + "px";
+        }
+        if (xOff > 0 && xOff < x2) {
+          cropDimensionRef.current.width = xDim / rect.width;
+          cropper.style.width = xDim * 100 + "%";
+          cropPositionRef.current.x = xOff / rect.height;
+          cropper.style.left = xOff + "px";
+        }
+      }
+      if (type === "all") {
+        const xOff = event.clientX - shiftX - rect.left;
+        const yOff = event.clientY - shiftY - rect.top;
+        const cropper = cropperRef.current as HTMLDivElement;
+        if (
+          yOff > 0 &&
+          yOff + cropDimensionRef.current.height * rect.height < rect.height
+        ) {
+          cropPositionRef.current.y = yOff / rect.height;
+          cropper.style.top = yOff + "px";
+        }
+        if (
+          xOff > 0 &&
+          xOff + cropDimensionRef.current.width * rect.width < rect.width
+        ) {
+          cropPositionRef.current.x = xOff / rect.width;
+          cropper.style.left = xOff + "px";
+        }
+      }
+      if (type === "size") {
+        const xOff =
+          event.clientX - rect.left - cropPositionRef.current.x * rect.width;
+        const yOff =
+          event.clientY - rect.top - cropPositionRef.current.y * rect.height;
+        const cropper = cropperRef.current as HTMLDivElement;
+        const xDim = xOff / rect.width;
+        const yDim = yOff / rect.height;
+        console.log(xDim, yDim);
+        if (yOff > 0 && yOff < rect.height) {
+          cropDimensionRef.current.height = yDim;
+          cropper.style.height = yDim * 100 + "%";
+        }
+        if (xOff > 0 && xOff < rect.width) {
+          cropDimensionRef.current.width = xDim;
+          cropper.style.width = xDim * 100 + "%";
+        }
+      }
+    }
+
+    // move the ball on mousemove
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseenter", onMouseEnter);
+    console.log("added");
+
+    target.onmouseleave = function () {
+      console.log("upp!!!");
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseenter", onMouseEnter);
+      target.onmouseup = null;
+      target.onmouseleave = null;
+    };
+
+    target.onmouseup = function () {
+      console.log("upp!!!");
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseenter", onMouseEnter);
+      target.onmouseup = null;
+      target.onmouseleave = null;
+    };
   };
 
   return (
@@ -159,7 +296,54 @@ export default () => {
         <h1 className="text-6xl text-bold text-center">
           Video Clipping Tool V1!
         </h1>
-        {video && <video ref={videoRef} src={video} autoPlay controls></video>}
+        <div ref={playerRef} className="m-2 relative">
+          <div className="absolute z-20" ref={cropperRef}>
+            <div
+              className="bg-gray-500 w-full h-full opacity-25 z-30"
+              draggable
+              onMouseDown={handleDrag("all")}
+              onDragStart={() => {
+                return false;
+              }}
+            ></div>
+            <div
+              className="w-8 h-8 rounded-full bg-red-600 opacity-75 absolute z-40"
+              style={{ top: "-1rem", left: "-1rem" }}
+              draggable
+              onMouseDown={handleDrag("pos")}
+              onDragStart={() => {
+                return false;
+              }}
+            ></div>
+            <div
+              className="w-8 h-8 rounded-full bg-red-600 opacity-75 absolute z-40"
+              style={{ bottom: "-1rem", right: "-1rem" }}
+              draggable
+              onMouseDown={handleDrag("size")}
+              onDragStart={() => {
+                return false;
+              }}
+            ></div>
+          </div>
+          <video
+            ref={videoRef}
+            src={video}
+            onVolumeChange={(e) => {
+              setVolume((e.target as HTMLVideoElement).volume * 100);
+            }}
+            onTimeUpdate={(e) => {
+              setProgress((e.target as HTMLVideoElement).currentTime);
+            }}
+            onPlay={(e) => {
+              if ((e.target as HTMLVideoElement).currentTime >= clip[1]) {
+                setProgress(clip[0]);
+                (e.target as HTMLVideoElement).currentTime = clip[0];
+              }
+            }}
+            autoPlay
+            // controls
+          ></video>
+        </div>
         <div className="flex flex-col w-4/5 mx-auto">
           <div>
             <input
@@ -230,33 +414,15 @@ export default () => {
           </div>
           <div className="flex flex-col mb-2">
             <span>Progress</span>
-            <div className="flex mb-2">
-              <input
-                type="number"
-                step=".01"
-                max={clip[1] ?? duration ?? 0}
-                min={clip[0] ?? 0}
-                className="p-2 mr-2 rounded border border-black flex-shrink"
-                value={progress}
-                onChange={(e) => {
-                  updateProgress(Number(e.target.value));
-                }}
-              />
-              <input
-                type="range"
-                step=".01"
-                className="w-100 flex-grow p-2"
-                max={clip[1] ?? duration ?? 0}
-                min={clip[0] ?? 0}
-                value={progress}
-                onMouseDown={() => {
-                  videoRef.current?.pause();
-                }}
-                onChange={(e) => {
-                  updateProgress(Number(e.target.value));
-                }}
-              />
-            </div>
+            <Slider
+              step={0.01}
+              max={clip[1] ?? duration ?? 0}
+              min={clip[0] ?? 0}
+              value={progress}
+              onChange={(e) => {
+                updateProgress(e);
+              }}
+            />
             <div className="flex">
               <button
                 className="rounded bg-blue-200 p-2"
@@ -290,23 +456,14 @@ export default () => {
           <div className="flex flex-col">
             <span>Quality Fps</span>
             <div>
-              <input
-                type="number"
-                className="p-2 rounded border border-black flex-shrink"
-                step=".01"
-                max={`${fps}`}
-                min="0"
+              <Slider
+                step={0.01}
+                max={fps}
+                min={0}
                 value={resFps}
-                onChange={(e) => setResFps(Number(e.target.value))}
-              />
-              <input
-                type="range"
-                max={`${fps}`}
-                min="0"
-                step=".01"
-                value={resFps}
-                onChange={(e) => setResFps(Number(e.target.value))}
-                className="p-2"
+                onChange={(e) => {
+                  setResFps(e);
+                }}
               />
               <button
                 className="rounded bg-blue-400 p-2"
@@ -328,23 +485,14 @@ export default () => {
               </button>
             </div>
             <div>
-              <input
-                type="number"
-                className="p-2 rounded border border-black flex-shrink"
-                step=".01"
-                max={`${1}`}
-                min="0"
+              <Slider
+                step={0.01}
+                max={1}
+                min={0}
                 value={resScale}
-                onChange={(e) => setResScale(Number(e.target.value))}
-              />
-              <input
-                type="range"
-                max={`${1}`}
-                min="0"
-                step=".01"
-                value={resScale}
-                onChange={(e) => setResScale(Number(e.target.value))}
-                className="p-2"
+                onChange={(e) => {
+                  setResScale(e);
+                }}
               />
               <button
                 className="rounded bg-blue-400 p-2"
@@ -374,10 +522,19 @@ export default () => {
           </div>
           <span>
             Approx size: {size / 1000000} MB (
-            {Math.round(sizeRef.current.width * resScale)}x
-            {Math.round(sizeRef.current.height * resScale)}px){" "}
+            {Math.round(
+              dimension.width * cropDimensionRef.current.width * resScale
+            )}
+            x
+            {Math.round(
+              dimension.height * cropDimensionRef.current.height * resScale
+            )}
+            px){" "}
           </span>
           <div>
+            <button className="rounded bg-blue-400 p-2" onClick={setCrop}>
+              Crop !
+            </button>
             <button className="rounded bg-blue-400 p-2" onClick={getGif}>
               Generate GIF !
             </button>
