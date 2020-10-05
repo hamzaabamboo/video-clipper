@@ -65,6 +65,11 @@ export default () => {
 
   const [maxQuality, setMaxQuality] = useState<boolean>(false);
 
+  const [prefetchProgress, setPrefetchProgress] = useState<number>(0);
+  const [isPreloading, setPreloading] = useState<boolean | "error" | "done">(
+    false
+  );
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
   const cropperRef = useRef<HTMLDivElement>(null);
@@ -98,8 +103,12 @@ export default () => {
 
   const size = useMemo(() => {
     return calculateFps(
-      dimension.width * (isCropping ? cropDimension.width : 1) * resScale,
-      dimension.height * (isCropping ? cropDimension.height : 1) * resScale,
+      (maxQuality ? 1980 : dimension.width) *
+        (isCropping ? cropDimension.width : 1) *
+        resScale,
+      (maxQuality ? 1980 : dimension.height) *
+        (isCropping ? cropDimension.height : 1) *
+        resScale,
       resFps,
       clip[1] - clip[0]
     );
@@ -108,6 +117,7 @@ export default () => {
     resFps,
     resScale,
     isCropping,
+    maxQuality,
     dimension.width,
     cropDimension.width,
     dimension.height,
@@ -299,9 +309,15 @@ export default () => {
       }
       if (type === "size") {
         const xOff =
-          event.clientX - rect.left - cropPositionRef.current.x * rect.width;
+          event.clientX -
+          rect.left -
+          cropPositionRef.current.x * rect.width +
+          event.movementX;
         const yOff =
-          event.clientY - rect.top - cropPositionRef.current.y * rect.height;
+          event.clientY -
+          rect.top -
+          cropPositionRef.current.y * rect.height +
+          event.movementY;
         const cropper = cropperRef.current as HTMLDivElement;
         const xDim = xOff / rect.width;
         const yDim = yOff / rect.height;
@@ -357,11 +373,39 @@ export default () => {
     cropper.style.top = cropPositionRef.current.y * (rect?.height ?? 0) + "px";
   };
 
+  const fetchProgress = async () => {
+    try {
+      const { data } = await axios.get(
+        "/clipper/preload?" + qs.encode({ url, max: maxQuality })
+      );
+      const { progress } = data;
+      if (progress === 100) {
+        setPreloading("done");
+        setPrefetchProgress(100);
+        return true;
+      } else {
+        setPreloading(true);
+        setPrefetchProgress(progress);
+        return false;
+      }
+    } catch {
+      setPreloading("error");
+    }
+  };
+
+  const preload = () => {
+    const f = async () => {
+      const res = await fetchProgress();
+      await sleep(2000);
+      if (!res) await f();
+    };
+    f();
+  };
   return (
     <div className="flex justify-center flex-col items-center min-h-screen py-2">
       <div className="flex justify-center flex-col items-center py-2">
         <h1 className="text-6xl font-bold text-center">
-          Video Clipping Tool V1.1!
+          Video Clipping Tool V1.2!
         </h1>
         <div ref={playerRef} className="m-2 relative">
           <div
@@ -635,16 +679,37 @@ export default () => {
               </button>
             </div>
           </div>
+          <div>
+            <h3 className="text-lg font-bold mb-2">Preloading</h3>
+            <div className="flex-row">
+              <button
+                className="rounded bg-blue-400 p-2 mr-2"
+                onClick={() => preload()}
+                disabled={isPreloading === true}
+              >
+                Preload
+              </button>
+              {isPreloading && (
+                <span>
+                  {isPreloading === "done"
+                    ? "Done"
+                    : isPreloading === "error"
+                    ? `Error`
+                    : `Preload ${prefetchProgress}%`}
+                </span>
+              )}
+            </div>
+          </div>
           <span>
             Approx size: {size / 1000000} MB (
             {Math.round(
-              dimension.width *
+              (maxQuality ? 1980 : dimension.width) *
                 (isCropping ? cropDimension.width : 1) *
                 resScale
             )}
             x
             {Math.round(
-              dimension.height *
+              (maxQuality ? 1080 : dimension.height) *
                 (isCropping ? cropDimension.height : 1) *
                 resScale
             )}
