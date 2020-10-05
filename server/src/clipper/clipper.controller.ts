@@ -15,6 +15,9 @@ import { Writable } from 'stream';
 import { AppLogger } from '../logger/logger';
 import { existsSync } from 'fs';
 
+const evenify = n =>
+  Math.round(n) % 2 === 0 ? Math.round(n) : Math.round(n) + 1;
+const round = n => Math.round(n * 100) / 100;
 @Controller('clipper')
 export class ClipperController implements OnApplicationShutdown {
   private streams: Writable[] = [];
@@ -67,23 +70,23 @@ export class ClipperController implements OnApplicationShutdown {
       return new HttpException('Video clip too long', 400);
     }
     try {
+      this.logger.verbose('[clipper] downloading info');
       const options = {
         quality: !type || type === 'gif' ? 18 : 'highest',
       };
       const info = await ytdl.getInfo(vid, options);
       const vidStream = ytdl(vid, options);
-
+      this.logger.verbose('[clipper] downloaded info');
       // vidStream.on('progress', (_, downloaded, total) => {
       //   this.logger.verbose(
       //     `[ytdl] ${Math.round((downloaded * 100) / total)}% of ${total}`,
       //   );
       // });
       let resStream = ffmpeg(vidStream);
+      // console.log(vid, Number(start ?? 0), end, dur);
 
       resStream = resStream.setDuration(dur);
-      // console.log(vid, Number(start ?? 0), end, dur);
-      if (Number(start ?? 0) > 0)
-        resStream = resStream.seekInput(Number(start ?? 0));
+      const filters = [];
 
       if (
         Number(x) >= 0 &&
@@ -91,15 +94,18 @@ export class ClipperController implements OnApplicationShutdown {
         Number(width) > 0 &&
         Number(height) > 0
       ) {
-        const h = info.formats[0].height;
-        const w = info.formats[0].width;
-        console.log(`crop=${width * w}:${height * h}:${x * w}:${y * h}`);
-        resStream = resStream.videoFilters(
-          `crop=${width * w}:${height * h}:${x * w}:${y * h}`,
+        filters.push(
+          `crop=${round(width)}*in_w:${round(height)}*in_h:${round(
+            x,
+          )}*in_w:${round(y)}*in_h`,
         );
       }
 
-      resStream = resStream.setSize(`${Math.floor((scale || 0.5) * 100)}%`);
+      filters.push(`scale=${scale}*in_w:-2`);
+      resStream = resStream.videoFilters(filters);
+
+      if (Number(start ?? 0) > 0)
+        resStream = resStream.seekInput(Number(start ?? 0));
 
       let filename = `${info.videoDetails.title}_${start}_${end}`;
 

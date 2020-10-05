@@ -26,9 +26,7 @@ export default () => {
   const [duration, setDuration] = useState<number>(0);
   const [progress, setProgress] = useState<number>(0);
   const [volume, setVolume] = useState<number>(0);
-  const [video, setVideoSrc] = useState<string>(
-    "https://r3---sn-w5nuxa-c33ey.googlevideo.com/videoplayback?expire=1601817223&ei=J3Z5X8f0NJPMvAS_37RA&ip=183.89.153.16&id=o-APKsPS5VT3uFTUUZk0TfzcEqQDfqSl8aID0Sx8_ZAont&itag=18&source=youtube&requiressl=yes&mh=dy&mm=31%2C26&mn=sn-w5nuxa-c33ey%2Csn-npoeenez&ms=au%2Conr&mv=m&mvi=3&pl=17&initcwndbps=1292500&vprv=1&mime=video%2Fmp4&gir=yes&clen=45410516&ratebypass=yes&dur=519.894&lmt=1601150325762198&mt=1601795428&fvip=3&fexp=23915654&c=WEB&txp=5530422&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cgir%2Cclen%2Cratebypass%2Cdur%2Clmt&sig=AOq0QJ8wRQIhAPkWbt9_LdRKwjFdlDt1I1SNMQa2dE09HiUe7jqyD-qRAiA6GalbHKRZKM5Qm9bg50v9o-nN4-5W7wIc_PFC3sEIEQ%3D%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIgDUsQrowxB05bdp4-meF59sHRY2Foyrd9hHwr1id9nhsCIQDgEiYi5gApC_RjCt7VSMqAve5fFvLhsss_a8RwiBtMLw%3D%3D"
-  );
+  const [video, setVideoSrc] = useState<string>("");
   const [clip, setClip] = useState<[number, number]>([0, 0]);
   const [fps, setFps] = useState<number>(30);
   const [loop, setLoop] = useState<boolean>(true);
