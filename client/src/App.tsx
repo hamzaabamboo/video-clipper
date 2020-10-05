@@ -361,7 +361,7 @@ export default () => {
     <div className="flex justify-center flex-col items-center min-h-screen py-2">
       <div className="flex justify-center flex-col items-center py-2">
         <h1 className="text-6xl font-bold text-center">
-          Video Clipping Tool V1!
+          Video Clipping Tool V1.1!
         </h1>
         <div ref={playerRef} className="m-2 relative">
           <div
