@@ -26,7 +26,7 @@ export class ClipperController implements OnApplicationShutdown {
 
   constructor(private logger: AppLogger) {
     this.logger.setContext('ClipperController');
-    rimraf.sync(path.join(__dirname, '../../../files/tmp'));
+    rimraf.sync(path.join(__dirname, '../../files/tmp'));
   }
   @Get('ping')
   public async ping() {
@@ -72,7 +72,6 @@ export class ClipperController implements OnApplicationShutdown {
       const tmpname = `tmp/preload-${info.videoDetails.title}${
         max ? '-max' : ''
       }.mp4`;
-      await mkdirp(path.join(__dirname, '../../../files/tmp'));
       // console.log(process.memoryUsage());
       if (this.preloadMap.get(tmpname) >= 100) {
         res.send({
@@ -100,9 +99,10 @@ export class ClipperController implements OnApplicationShutdown {
         this.preloadMap.set(tmpname, percent);
         // this.logger.verbose('[preload] downloading ' + tmpname + ' ' + percent);
       });
+      await mkdirp(path.join(__dirname, '../../files/tmp'));
       const resStream = vidStream
         .pipe(
-          createWriteStream(path.join(__dirname, '../../../files', tmpname), {
+          createWriteStream(path.join(__dirname, '../../files', tmpname), {
             highWaterMark: 1024 * 64,
           }),
         )
@@ -168,7 +168,7 @@ export class ClipperController implements OnApplicationShutdown {
       let resStream;
       if (this.preloadMap.get(preload) === 100) {
         this.logger.verbose('[clipper] using preloaded video');
-        resStream = ffmpeg(path.join(__dirname, '../../../files', preload));
+        resStream = ffmpeg(path.join(__dirname, '../../files', preload));
       } else {
         this.logger.verbose('[clipper] downloaded info');
         console.dir(info.formats[0]);
@@ -244,11 +244,11 @@ export class ClipperController implements OnApplicationShutdown {
           const tmpname = `tmp/tmp-${filename}-${scale}-${x}-${y}-${width}-${height}${
             max ? '-max' : ''
           }.mp4`;
-          await mkdirp(path.join(__dirname, '../../../files/tmp'));
-          if (!existsSync(path.join(__dirname, '../../../files', tmpname)))
+          await mkdirp(path.join(__dirname, '../../files/tmp'));
+          if (!existsSync(path.join(__dirname, '../../files', tmpname)))
             await new Promise((resolve, reject) =>
               resStream
-                .saveToFile(path.join(__dirname, '../../../files', tmpname))
+                .saveToFile(path.join(__dirname, '../../files', tmpname))
                 .on('progress', progress => {
                   this.logger.verbose(`[download] ${JSON.stringify(progress)}`);
                 })
@@ -263,7 +263,7 @@ export class ClipperController implements OnApplicationShutdown {
             );
 
           this.logger.verbose(`Creating GIF for ${info.videoDetails.title}`);
-          resStream = ffmpeg(path.join(__dirname, '../../../files', tmpname))
+          resStream = ffmpeg(path.join(__dirname, '../../files', tmpname))
             .format('gif')
             .outputFPS(Number(fps))
             .videoFilter(
