@@ -73,7 +73,7 @@ export class ClipperController implements OnApplicationShutdown {
         max ? '-max' : ''
       }.mp4`;
       await mkdirp(path.join(__dirname, '../../../files/tmp'));
-      console.log(process.memoryUsage());
+      // console.log(process.memoryUsage());
       if (this.preloadMap.get(tmpname) >= 100) {
         res.send({
           message: 'Downloaded',
