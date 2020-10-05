@@ -65,6 +65,9 @@ export default () => {
 
   const [maxQuality, setMaxQuality] = useState<boolean>(false);
 
+  const [prefetchProgress, setPrefetchProgress] = useState<number>(0);
+  const [isPreloading, setPreloading] = useState<boolean>(false);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
   const cropperRef = useRef<HTMLDivElement>(null);
@@ -98,8 +101,12 @@ export default () => {
 
   const size = useMemo(() => {
     return calculateFps(
-      dimension.width * (isCropping ? cropDimension.width : 1) * resScale,
-      dimension.height * (isCropping ? cropDimension.height : 1) * resScale,
+      (maxQuality ? 1980 : dimension.width) *
+        (isCropping ? cropDimension.width : 1) *
+        resScale,
+      (maxQuality ? 1980 : dimension.height) *
+        (isCropping ? cropDimension.height : 1) *
+        resScale,
       resFps,
       clip[1] - clip[0]
     );
@@ -108,6 +115,7 @@ export default () => {
     resFps,
     resScale,
     isCropping,
+    maxQuality,
     dimension.width,
     cropDimension.width,
     dimension.height,
@@ -357,6 +365,30 @@ export default () => {
     cropper.style.top = cropPositionRef.current.y * (rect?.height ?? 0) + "px";
   };
 
+  const fetchProgress = async () => {
+    const { data } = await axios.get(
+      "/clipper/preload?" + qs.encode({ url, max: maxQuality })
+    );
+    const { progress } = data;
+    if (progress === 100) {
+      setPreloading(false);
+      setPrefetchProgress(100);
+      return true;
+    } else {
+      setPreloading(true);
+      setPrefetchProgress(progress);
+      return false;
+    }
+  };
+
+  const preload = () => {
+    const f = async () => {
+      const res = await fetchProgress();
+      await sleep(2000);
+      if (!res) await f();
+    };
+    f();
+  };
   return (
     <div className="flex justify-center flex-col items-center min-h-screen py-2">
       <div className="flex justify-center flex-col items-center py-2">
@@ -635,16 +667,28 @@ export default () => {
               </button>
             </div>
           </div>
+          <div>
+            <h3 className="text-lg font-bold mb-2">Preload</h3>
+            <div className="flex-row">
+              <button
+                className="rounded bg-blue-400 p-2 mr-2"
+                onClick={() => preload()}
+              >
+                Preload
+              </button>
+              {isPreloading && <span>Preload {prefetchProgress}%</span>}
+            </div>
+          </div>
           <span>
             Approx size: {size / 1000000} MB (
             {Math.round(
-              dimension.width *
+              (maxQuality ? 1980 : dimension.width) *
                 (isCropping ? cropDimension.width : 1) *
                 resScale
             )}
             x
             {Math.round(
-              dimension.height *
+              (maxQuality ? 1080 : dimension.height) *
                 (isCropping ? cropDimension.height : 1) *
                 resScale
             )}
