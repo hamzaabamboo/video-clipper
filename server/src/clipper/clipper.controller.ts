@@ -25,6 +25,10 @@ export class ClipperController implements OnApplicationShutdown {
   constructor(private logger: AppLogger) {
     this.logger.setContext('ClipperController');
   }
+  @Get('ping')
+  public async ping() {
+    return 'pong';
+  }
 
   @Get('vid')
   public async getStream(@Query('url') url: string) {
@@ -56,6 +60,7 @@ export class ClipperController implements OnApplicationShutdown {
     @Query('y') y = 0,
     @Query('width') width = 1,
     @Query('height') height = 1,
+    @Query('max') max = false,
     @Res() res: Response,
   ) {
     if (!url) throw new HttpException('Url is not supplied', 400);
@@ -71,9 +76,11 @@ export class ClipperController implements OnApplicationShutdown {
     }
     try {
       this.logger.verbose('[clipper] downloading info');
-      const options = {
-        quality: !type || type === 'gif' ? 18 : 'highest',
-      };
+      const options = max
+        ? { quality: 'highestvideo' }
+        : {
+            quality: !type || type === 'gif' ? 18 : 'highest',
+          };
       const info = await ytdl.getInfo(vid, options);
       const vidStream = ytdl(vid, options);
       this.logger.verbose('[clipper] downloaded info');
@@ -105,7 +112,9 @@ export class ClipperController implements OnApplicationShutdown {
       resStream = resStream.videoFilters(filters);
 
       if (Number(start ?? 0) > 0)
-        resStream = resStream.seekInput(Number(start ?? 0));
+        resStream = max
+          ? resStream.seekOutput(Number(start ?? 0))
+          : resStream.seekInput(Number(start ?? 0));
 
       let filename = `${info.videoDetails.title}_${start}_${end}`;
 
@@ -146,7 +155,9 @@ export class ClipperController implements OnApplicationShutdown {
           this.logger.verbose(
             `Saving temp file for ${info.videoDetails.title}`,
           );
-          const tmpname = `tmp/tmp-${filename}-${scale}-${x}-${y}-${width}-${height}.mp4`;
+          const tmpname = `tmp/tmp-${filename}-${scale}-${x}-${y}-${width}-${height}${
+            max ? '-max' : ''
+          }.mp4`;
           await mkdirp(path.join(__dirname, '../../../files/tmp'));
           if (!existsSync(path.join(__dirname, '../../../files', tmpname)))
             await new Promise((resolve, reject) =>

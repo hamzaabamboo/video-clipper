@@ -10,6 +10,8 @@ const calculateFps = (w: number, h: number, fps: number, length: number) => {
   return (4 * (w * h * fps * length)) / 8;
 };
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 interface Coordinate {
   x: number;
   y: number;
@@ -41,13 +43,13 @@ export default () => {
     y: 0,
   });
   const cropDimensionRef = useRef<Dimension>({
-    width: 0.5,
-    height: 0.5,
+    width: 1,
+    height: 1,
   });
 
   const [cropDimension, setCropDimesion] = useState<Dimension>({
-    width: 0.5,
-    height: 0.5,
+    width: 1,
+    height: 1,
   });
 
   const [cropPosition, setCropPosition] = useState<Coordinate>({
@@ -58,9 +60,15 @@ export default () => {
   const [resScale, setResScale] = useState<number>(1);
   const [resFps, setResFps] = useState<number>(30);
 
+  const [isPlaying, _setPlaying] = useState<boolean>(false);
+  const [isCropping, setCropping] = useState<boolean>(false);
+
+  const [maxQuality, setMaxQuality] = useState<boolean>(false);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
   const cropperRef = useRef<HTMLDivElement>(null);
+
   const dlUrl = useMemo(() => {
     return (
       url &&
@@ -72,22 +80,50 @@ export default () => {
           end: clip[1],
           fps: resFps,
           scale: resScale,
-          ...cropDimension,
-          ...cropPosition,
+          ...(isCropping ? cropDimension : {}),
+          ...(isCropping ? cropPosition : {}),
+          max: maxQuality,
         })
     );
-  }, [url, clip, resFps, resScale, cropDimension, cropPosition]);
+  }, [
+    url,
+    clip,
+    resFps,
+    resScale,
+    cropDimension,
+    cropPosition,
+    isCropping,
+    maxQuality,
+  ]);
 
   const size = useMemo(() => {
     return calculateFps(
-      dimension.width * resScale,
-      dimension.height * resScale,
+      dimension.width * (isCropping ? cropDimension.width : 1) * resScale,
+      dimension.height * (isCropping ? cropDimension.height : 1) * resScale,
       resFps,
       clip[1] - clip[0]
     );
-  }, [clip, resFps, resScale]);
+  }, [
+    clip,
+    resFps,
+    resScale,
+    isCropping,
+    dimension.width,
+    cropDimension.width,
+    dimension.height,
+    cropDimension.height,
+  ]);
 
   const seekingRef = useRef(false);
+
+  const setPlaying = (play: boolean) => {
+    if (play) {
+      videoRef.current?.play();
+    } else {
+      videoRef.current?.pause();
+    }
+    _setPlaying(play);
+  };
 
   const updateProgress = (time: number) => {
     if (videoRef.current) {
@@ -98,6 +134,21 @@ export default () => {
 
   useEffect(() => {
     setUrl(localStorage.getItem("videoUrl") ?? "");
+    updateCrop();
+    let done = false;
+    const f = async () => {
+      await axios.get("/clipper/ping");
+      await sleep(10000);
+      if (!done) {
+        await f();
+      } else {
+        console.log("bye");
+      }
+    };
+    f();
+    return () => {
+      done = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -107,21 +158,22 @@ export default () => {
 
   useEffect(() => {
     if (clip[1] && !seekingRef.current && progress >= clip[1]) {
-      if (!loop) videoRef.current?.pause();
-      updateProgress(clip[0]);
+      if (!loop) updateProgress(clip[0]);
+      else setPlaying(false);
     } else if (progress < clip[0]) {
-      if (!videoRef.current?.paused) videoRef.current?.pause();
+      if (!videoRef.current?.paused) setPlaying(false);
       updateProgress(clip[0]);
     }
-  }, [progress]);
+  }, [progress, clip, loop]);
 
   useEffect(() => {
-    const toggle = (e) => {
+    const toggle = (e: KeyboardEvent) => {
       if (e.key === " ") {
-        if (videoRef.current?.paused) videoRef.current?.play();
-        else videoRef.current?.pause();
+        if (videoRef.current?.paused) setPlaying(true);
+        else setPlaying(false);
         e.preventDefault();
         e.stopImmediatePropagation();
+        e.stopPropagation();
       }
     };
     window.addEventListener("keypress", toggle);
@@ -138,7 +190,7 @@ export default () => {
       } = await axios.get("/clipper/vid?" + qs.encode({ url }));
       setVideoSrc(data.url);
       if (videoRef.current) {
-        videoRef.current.play();
+        setPlaying(true);
         videoRef.current.muted = false;
       }
       setFps(data.fps);
@@ -150,7 +202,7 @@ export default () => {
       });
       cropPositionRef.current = { x: 0, y: 0 };
       cropDimensionRef.current = { width: 1, height: 1 };
-
+      resetCrop();
       setVolume(50);
     } catch {
       setVideoSrc("");
@@ -166,8 +218,9 @@ export default () => {
           end: clip[1],
           fps: resFps,
           scale: resScale,
-          ...cropDimension,
-          ...cropPosition,
+          ...(isCropping ? cropDimension : {}),
+          ...(isCropping ? cropPosition : {}),
+          max: maxQuality,
         })
     );
   };
@@ -186,7 +239,6 @@ export default () => {
     let shiftY = event.nativeEvent.clientY - target.getBoundingClientRect().top;
     event.nativeEvent.stopPropagation();
     event.nativeEvent.preventDefault();
-    console.log(target.getBoundingClientRect());
     const t = playerRef.current as HTMLDivElement;
 
     const rect = t.getBoundingClientRect();
@@ -213,7 +265,6 @@ export default () => {
         const xDim = (x2 - xOff) / rect.width;
         const yDim = (y2 - yOff) / rect.height;
 
-        console.log(x2, xOff, y2, yOff);
         if (yOff > 0 && yOff < y2) {
           cropDimensionRef.current.height = yDim / rect.height;
           cropper.style.height = yDim * 100 + "%";
@@ -269,7 +320,6 @@ export default () => {
     // move the ball on mousemove
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseenter", onMouseEnter);
-    console.log("added");
 
     target.onmouseleave = function () {
       console.log("upp!!!");
@@ -288,14 +338,39 @@ export default () => {
     };
   };
 
+  const resetCrop = () => {
+    cropDimensionRef.current.width = 1;
+    cropPositionRef.current.x = 0;
+    cropDimensionRef.current.height = 1;
+    cropPositionRef.current.y = 0;
+
+    updateCrop();
+  };
+
+  const updateCrop = () => {
+    const cropper = cropperRef.current as HTMLDivElement;
+    const rect = playerRef.current?.getBoundingClientRect();
+
+    cropper.style.width = cropDimensionRef.current.width * 100 + "%";
+    cropper.style.left = cropPositionRef.current.x * (rect?.width ?? 0) + "px";
+    cropper.style.height = cropDimensionRef.current.height * 100 + "%";
+    cropper.style.top = cropPositionRef.current.y * (rect?.height ?? 0) + "px";
+  };
+
   return (
     <div className="flex justify-center flex-col items-center min-h-screen py-2">
       <div className="flex justify-center flex-col items-center py-2">
-        <h1 className="text-6xl text-bold text-center">
+        <h1 className="text-6xl font-bold text-center">
           Video Clipping Tool V1!
         </h1>
         <div ref={playerRef} className="m-2 relative">
-          <div className="absolute z-20" ref={cropperRef}>
+          <div
+            className="absolute z-20"
+            ref={cropperRef}
+            style={{
+              display: isCropping ? "block" : "none",
+            }}
+          >
             <div
               className="bg-gray-500 w-full h-full opacity-25 z-30"
               draggable
@@ -351,10 +426,22 @@ export default () => {
               onChange={(e) => setUrl(e.target.value)}
             />
             <button
-              className="rounded border bg-red-500 m-2 p-2 text-white"
+              className="rounded border bg-red-500 mr-2 my-2 p-2 text-white"
               onClick={() => getVid()}
             >
-              Search
+              Load video
+            </button>
+            <button
+              className="rounded border bg-blue-500 mr-2 my-2 p-2 text-white"
+              onClick={() => setPlaying(!isPlaying)}
+            >
+              {!isPlaying ? "Play" : "Pause"}
+            </button>
+            <button
+              className="rounded border bg-green-500 mr-2 my-2 p-2 text-white"
+              onClick={() => setLoop(!loop)}
+            >
+              {!loop ? "No Loop" : "Loop"}
             </button>
           </div>
           <div className="w-80 flex items-center mb-2">
@@ -411,7 +498,7 @@ export default () => {
             />
           </div>
           <div className="flex flex-col mb-2">
-            <span>Progress</span>
+            <span className="text-lg font-bold mb-2">Progress</span>
             <Slider
               step={0.01}
               max={clip[1] ?? duration ?? 0}
@@ -423,7 +510,7 @@ export default () => {
             />
             <div className="flex">
               <button
-                className="rounded bg-blue-200 p-2"
+                className="rounded bg-blue-200 p-2 mr-2"
                 onClick={() => {
                   setClip([progress, clip[1]]);
                 }}
@@ -441,7 +528,7 @@ export default () => {
             </div>
           </div>
           <div className="flex flex-col">
-            <span>Volume</span>
+            <span className="text-lg font-bold mb-2">Volume</span>
             <input
               type="range"
               max="100"
@@ -452,7 +539,7 @@ export default () => {
             />
           </div>
           <div className="flex flex-col">
-            <span>Quality Fps</span>
+            <span className="text-lg font-bold mb-2">Fps</span>
             <div>
               <Slider
                 step={0.01}
@@ -464,24 +551,25 @@ export default () => {
                 }}
               />
               <button
-                className="rounded bg-blue-400 p-2"
+                className="rounded bg-blue-400 mr-2 p-2"
                 onClick={() => setResFps(10)}
               >
                 10fps
               </button>
               <button
-                className="rounded bg-blue-400 p-2"
+                className="rounded bg-blue-400 mr-2 p-2"
                 onClick={() => setResFps(15)}
               >
                 15fps
               </button>
               <button
-                className="rounded bg-blue-400 p-2"
+                className="rounded bg-blue-400 mr-2 p-2"
                 onClick={() => setResFps(21)}
               >
                 21fps
               </button>
             </div>
+            <span className="text-lg font-bold mb-2">Scale</span>
             <div>
               <Slider
                 step={0.01}
@@ -493,46 +581,76 @@ export default () => {
                 }}
               />
               <button
-                className="rounded bg-blue-400 p-2"
+                className="rounded bg-blue-400 p-2  mr-2"
                 onClick={() => setResScale(1)}
               >
                 100%
               </button>
               <button
-                className="rounded bg-blue-400 p-2"
+                className="rounded bg-blue-400 p-2  mr-2"
                 onClick={() => setResScale(0.75)}
               >
                 75%
               </button>
               <button
-                className="rounded bg-blue-400 p-2"
+                className="rounded bg-blue-400 p-2  mr-2"
                 onClick={() => setResScale(0.5)}
               >
                 50%
               </button>
               <button
-                className="rounded bg-blue-400 p-2"
+                className="rounded bg-blue-400 p-2  mr-2"
                 onClick={() => setResScale(0.25)}
               >
                 25%
               </button>
             </div>
           </div>
+          <div>
+            <h3 className="text-lg font-bold mb-2">Crop</h3>
+            <div className="flex-row">
+              <button
+                className="rounded bg-blue-400 p-2 mr-2"
+                onClick={() => setCropping((c) => !c)}
+              >
+                {isCropping ? "No Crop" : "Crop"}
+              </button>
+              <button
+                className="rounded bg-blue-400 p-2 mr-2"
+                onClick={setCrop}
+              >
+                Set Crop
+              </button>
+              <button
+                className="rounded bg-red-400 p-2 mr-2"
+                onClick={resetCrop}
+              >
+                Reset Crop
+              </button>
+              <button
+                className="rounded bg-blue-400 p-2 mr-2"
+                onClick={() => setMaxQuality((c) => !c)}
+              >
+                {maxQuality ? "Max Quality" : "Normal Quality"}
+              </button>
+            </div>
+          </div>
           <span>
             Approx size: {size / 1000000} MB (
             {Math.round(
-              dimension.width * cropDimensionRef.current.width * resScale
+              dimension.width *
+                (isCropping ? cropDimension.width : 1) *
+                resScale
             )}
             x
             {Math.round(
-              dimension.height * cropDimensionRef.current.height * resScale
+              dimension.height *
+                (isCropping ? cropDimension.height : 1) *
+                resScale
             )}
             px){" "}
           </span>
           <div>
-            <button className="rounded bg-blue-400 p-2" onClick={setCrop}>
-              Crop !
-            </button>
             <button className="rounded bg-blue-400 p-2" onClick={getGif}>
               Generate GIF !
             </button>
@@ -563,7 +681,9 @@ export default () => {
             )}
           </div>
         </div>
-        {res && <img src={"/clipper/" + res} />}
+        <div className="p-2">
+          {res && <img alt="result gif" src={"/clipper/" + res} />}
+        </div>
       </div>
     </div>
   );
