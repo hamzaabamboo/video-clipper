@@ -64,12 +64,16 @@ export class ClipperController implements OnApplicationShutdown {
         : {
             quality: !type || type === 'gif' ? 18 : 'highest',
           };
-      const info = await ytdl.getInfo(vid, options);
+      const info = await ytdl.getInfo(vid, {
+        ...options,
+        highWaterMark: 1024 * 256,
+      });
       const vidStream = ytdl(vid, options);
       const tmpname = `tmp/preload-${info.videoDetails.title}${
         max ? '-max' : ''
       }.mp4`;
       await mkdirp(path.join(__dirname, '../../../files/tmp'));
+      console.log(process.memoryUsage());
       if (this.preloadMap.get(tmpname) >= 100) {
         res.send({
           message: 'Downloaded',
@@ -98,7 +102,9 @@ export class ClipperController implements OnApplicationShutdown {
       });
       const resStream = vidStream
         .pipe(
-          createWriteStream(path.join(__dirname, '../../../files', tmpname)),
+          createWriteStream(path.join(__dirname, '../../../files', tmpname), {
+            highWaterMark: 1024 * 64,
+          }),
         )
         .on('error', e => {
           this.preloadMap.set(tmpname, -1);
