@@ -66,7 +66,9 @@ export default () => {
   const [maxQuality, setMaxQuality] = useState<boolean>(false);
 
   const [prefetchProgress, setPrefetchProgress] = useState<number>(0);
-  const [isPreloading, setPreloading] = useState<boolean>(false);
+  const [isPreloading, setPreloading] = useState<boolean | "error" | "done">(
+    false
+  );
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -307,9 +309,15 @@ export default () => {
       }
       if (type === "size") {
         const xOff =
-          event.clientX - rect.left - cropPositionRef.current.x * rect.width;
+          event.clientX -
+          rect.left -
+          cropPositionRef.current.x * rect.width +
+          event.movementX;
         const yOff =
-          event.clientY - rect.top - cropPositionRef.current.y * rect.height;
+          event.clientY -
+          rect.top -
+          cropPositionRef.current.y * rect.height +
+          event.movementY;
         const cropper = cropperRef.current as HTMLDivElement;
         const xDim = xOff / rect.width;
         const yDim = yOff / rect.height;
@@ -366,18 +374,22 @@ export default () => {
   };
 
   const fetchProgress = async () => {
-    const { data } = await axios.get(
-      "/clipper/preload?" + qs.encode({ url, max: maxQuality })
-    );
-    const { progress } = data;
-    if (progress === 100) {
-      setPreloading(false);
-      setPrefetchProgress(100);
-      return true;
-    } else {
-      setPreloading(true);
-      setPrefetchProgress(progress);
-      return false;
+    try {
+      const { data } = await axios.get(
+        "/clipper/preload?" + qs.encode({ url, max: maxQuality })
+      );
+      const { progress } = data;
+      if (progress === 100) {
+        setPreloading("done");
+        setPrefetchProgress(100);
+        return true;
+      } else {
+        setPreloading(true);
+        setPrefetchProgress(progress);
+        return false;
+      }
+    } catch {
+      setPreloading("error");
     }
   };
 
@@ -668,15 +680,24 @@ export default () => {
             </div>
           </div>
           <div>
-            <h3 className="text-lg font-bold mb-2">Preload</h3>
+            <h3 className="text-lg font-bold mb-2">Preloading</h3>
             <div className="flex-row">
               <button
                 className="rounded bg-blue-400 p-2 mr-2"
                 onClick={() => preload()}
+                disabled={isPreloading === true}
               >
                 Preload
               </button>
-              {isPreloading && <span>Preload {prefetchProgress}%</span>}
+              {isPreloading && (
+                <span>
+                  {isPreloading === "done"
+                    ? "Done"
+                    : isPreloading === "error"
+                    ? `Error`
+                    : `Preload ${prefetchProgress}%`}
+                </span>
+              )}
             </div>
           </div>
           <span>
