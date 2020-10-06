@@ -1,5 +1,5 @@
 **/node_modules
-/files
+**/files
 server/client
 **/dist
 **/build
