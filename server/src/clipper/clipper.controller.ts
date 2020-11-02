@@ -39,7 +39,9 @@ export class ClipperController implements OnApplicationShutdown {
     const vid = url;
     try {
       const info = await ytdl.getInfo(vid, {
-        quality: 'highest',
+        requestOptions: {
+          quality: 'highest',
+        },
       });
       return {
         data: info.formats[0],
@@ -65,8 +67,10 @@ export class ClipperController implements OnApplicationShutdown {
             quality: !type || type === 'gif' ? 18 : 'highest',
           };
       const info = await ytdl.getInfo(vid, {
-        ...options,
-        highWaterMark: 1024 * 256,
+        requestOptions: {
+          ...options,
+          highWaterMark: 1024 * 256,
+        },
       });
       const vidStream = ytdl(vid, options);
       const tmpname = `tmp/preload-${info.videoDetails.title}${
@@ -155,18 +159,21 @@ export class ClipperController implements OnApplicationShutdown {
     }
     try {
       this.logger.verbose('[clipper] downloading info');
-      const options = max
-        ? { quality: 'highestvideo' }
-        : {
-            quality: !type || type === 'gif' ? 18 : 'highest',
-          };
-      const info = await ytdl.getInfo(vid, options);
+      const options =
+        type === 'mp3'
+          ? { quality: '140' }
+          : max
+          ? { quality: 'highestvideo' }
+          : {
+              quality: !type || type === 'gif' ? 18 : 'highest',
+            };
+      const info = await ytdl.getInfo(vid, { requestOptions: options });
       const vidStream = ytdl(vid, options);
       const preload = `tmp/preload-${info.videoDetails.title}${
         max ? '-max' : ''
       }.mp4`;
       let resStream;
-      if (this.preloadMap.get(preload) === 100) {
+      if (type !== 'mp3' && this.preloadMap.get(preload) === 100) {
         this.logger.verbose('[clipper] using preloaded video');
         resStream = ffmpeg(path.join(__dirname, '../../files', preload));
       } else {
@@ -182,23 +189,23 @@ export class ClipperController implements OnApplicationShutdown {
       }
       resStream = resStream.setDuration(dur);
       const filters = [];
+      if (type !== 'mp3') {
+        if (
+          Number(x) >= 0 &&
+          Number(y) >= 0 &&
+          Number(width) > 0 &&
+          Number(height) > 0
+        ) {
+          filters.push(
+            `crop=${round(width)}*in_w:${round(height)}*in_h:${round(
+              x,
+            )}*in_w:${round(y)}*in_h`,
+          );
+        }
 
-      if (
-        Number(x) >= 0 &&
-        Number(y) >= 0 &&
-        Number(width) > 0 &&
-        Number(height) > 0
-      ) {
-        filters.push(
-          `crop=${round(width)}*in_w:${round(height)}*in_h:${round(
-            x,
-          )}*in_w:${round(y)}*in_h`,
-        );
+        filters.push(`scale=${scale}*in_w:-2`);
+        resStream = resStream.videoFilters(filters);
       }
-
-      filters.push(`scale=${scale}*in_w:-2`);
-      resStream = resStream.videoFilters(filters);
-
       if (Number(start ?? 0) > 0)
         resStream = resStream.seekInput(Number(start ?? 0));
 
