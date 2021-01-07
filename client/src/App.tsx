@@ -5,7 +5,7 @@ import axios from "axios";
 import qs from "querystring";
 import "./styles/tailwind.css";
 import "rc-slider/assets/index.css";
-import { clipStream, ffmpeg } from "./clipper";
+import { clipStream, downloadVideo, ffmpeg } from "./clipper";
 import { Dimension, Coordinate, Cropper } from "./components/Cropper";
 
 const calculateFps = (w: number, h: number, fps: number, length: number) => {
@@ -14,6 +14,8 @@ const calculateFps = (w: number, h: number, fps: number, length: number) => {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const DEFAULT_HEIGHT = 480;
+type SourceType = "youtube" | "upload";
 const App = () => {
   const [url, setUrl] = useState<string>(
     "https://www.youtube.com/watch?v=ebSce4xUjo0"
@@ -21,11 +23,16 @@ const App = () => {
   const [duration, setDuration] = useState<number>(0);
   const [progress, setProgress] = useState<number>(0);
   const [volume, setVolume] = useState<number>(0);
-  const [video, setVideoSrc] = useState<{ url: string; title: string }>();
+  const [video, setVideoSrc] = useState<{
+    url: string;
+    title: string;
+    type: SourceType;
+  }>();
   const [clip, setClip] = useState<[number, number]>([0, 0]);
   const [fps, setFps] = useState<number>(30);
   const [loop, setLoop] = useState<boolean>(true);
   const [res, setRes] = useState<string>("");
+  const [mode, setMode] = useState<SourceType>("youtube");
   const [isFFMpegLoading, setFFMpegLoading] = useState(false);
   const [convertProgress, setConvertProgress] = useState<{
     message: string;
@@ -56,6 +63,7 @@ const App = () => {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const cropperRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dlUrl = useMemo(() => {
     return (
@@ -145,6 +153,25 @@ const App = () => {
     };
     f();
     g();
+    if (!videoRef.current) return;
+    videoRef.current.ondurationchange = () => {
+      setDuration(Number(videoRef.current?.duration ?? 0));
+      setClip([0, Number(videoRef.current?.duration)]);
+    };
+    videoRef.current.onloadedmetadata = () => {
+      setPlaying(true);
+      if (!videoRef.current) return;
+      videoRef.current.muted = false;
+      setFps(30);
+      setDuration(Number(videoRef.current?.duration ?? 0));
+      setDimensions({
+        width: videoRef.current?.videoWidth ?? 0,
+        height: videoRef.current?.videoHeight ?? 0,
+      });
+      setResScale(DEFAULT_HEIGHT / videoRef.current?.videoHeight ?? 1);
+      cropperRef.current.resetCrop();
+      setVolume(50);
+    };
     return () => {
       done = true;
     };
@@ -191,20 +218,10 @@ const App = () => {
       setVideoSrc({
         url: data.url,
         title,
+
+        type: "youtube",
       });
-      if (videoRef.current) {
-        setPlaying(true);
-        videoRef.current.muted = false;
-      }
       setFps(data.fps);
-      setDuration(Number(data.approxDurationMs) / 1000);
-      setClip([0, Number(data.approxDurationMs) / 1000]);
-      setDimensions({
-        width: bestVideo.width,
-        height: bestVideo.height,
-      });
-      cropperRef.current.resetCrop();
-      setVolume(50);
     } catch {
       setVideoSrc(undefined);
     }
@@ -213,8 +230,31 @@ const App = () => {
   const getGif = async () => {
     if (!video) return;
     try {
+      let buffer: Uint8Array;
+      switch (video.type) {
+        case "upload":
+          setConvertProgress({
+            message: "Loading Video...",
+          });
+          const videoFile = fileInputRef?.current?.files?.[0];
+          if (!videoFile) return;
+          buffer = new Uint8Array((await videoFile.arrayBuffer()) ?? []);
+          setConvertProgress({
+            message: "Loading Video...",
+          });
+          break;
+        default:
+          setConvertProgress({
+            message: "Downloading Video...",
+          });
+          buffer = await downloadVideo(url, video?.title ?? "");
+          setConvertProgress({
+            message: "Video Downloaded",
+          });
+          break;
+      }
       const r = await clipStream(
-        url,
+        buffer,
         video?.title,
         clip[0],
         clip[1],
@@ -228,9 +268,23 @@ const App = () => {
         cropDimension.height,
         (progress) => setConvertProgress(progress)
       );
-      setRes("data:image/gif;base64, " + r);
-    } finally {
+      setRes(URL.createObjectURL(r));
+    } catch (e) {
+      setConvertProgress({
+        message: "Something Went Wrong... " + e,
+      });
     }
+  };
+
+  const loadVideo = async () => {
+    const video = fileInputRef?.current?.files?.[0];
+    if (!video) return;
+    setVideoSrc({
+      url: URL.createObjectURL(video),
+      title: video.name.split(".").slice(undefined, -1).join(""),
+      type: "upload",
+    });
+    if (!videoRef.current) return;
   };
 
   return (
@@ -269,19 +323,46 @@ const App = () => {
         </Cropper>
         <div className="flex grid gap-2 grid-cols-2 w-4/5 mx-auto">
           <div>
+            <button
+              className="rounded border bg-blue-500 mr-2 my-2 p-2 text-white"
+              onClick={() => setMode(mode === "youtube" ? "upload" : "youtube")}
+            >
+              Change Mode
+            </button>
+            {mode === "youtube" ? (
+              <div>
+                <span className="text-lg font-bold mb-2">Youtube Video</span>
+                <input
+                  type="text"
+                  className="p-2 mr-2 rounded border w-full border-black"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                />
+                <button
+                  className="rounded border bg-red-500 mr-2 my-2 p-2 text-white"
+                  onClick={() => getVid()}
+                >
+                  Load video
+                </button>
+              </div>
+            ) : (
+              <div>
+                <span className="text-lg font-bold mb-2">Upload Video</span>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="p-2 mr-2 rounded border w-full border-black"
+                  accept="video/*, .mkv"
+                />
+                <button
+                  className="rounded border bg-red-500 mr-2 my-2 p-2 text-white"
+                  onClick={() => loadVideo()}
+                >
+                  Upload video
+                </button>
+              </div>
+            )}
             <div>
-              <input
-                type="text"
-                className="p-2 mr-2 rounded border w-full border-black"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-              />
-              <button
-                className="rounded border bg-red-500 mr-2 my-2 p-2 text-white"
-                onClick={() => getVid()}
-              >
-                Load video
-              </button>
               <button
                 className="rounded border bg-blue-500 mr-2 my-2 p-2 text-white"
                 onClick={() => setPlaying(!isPlaying)}
@@ -457,6 +538,9 @@ const App = () => {
                 >
                   25%
                 </button>
+                <span>
+                  {dimension.width * resScale} x {dimension.height * resScale}
+                </span>
               </div>
             </div>
             <div>
@@ -543,7 +627,9 @@ const App = () => {
         <div className="p-2">
           {convertProgress &&
             `${convertProgress.message} ${
-              convertProgress.message ? convertProgress.message + "%" : ""
+              (convertProgress.ratio ?? 0) > 0
+                ? convertProgress.ratio + "%"
+                : ""
             }`}
         </div>
         <div className="p-2">{res && <img alt="result gif" src={res} />}</div>

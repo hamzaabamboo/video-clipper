@@ -1,5 +1,4 @@
 import { createFFmpeg, fetchFile } from "@ffmpeg/ffmpeg";
-import { bytesToBase64 } from "./utils/base64";
 
 export const ffmpeg = createFFmpeg({
   log: true,
@@ -9,29 +8,40 @@ const verbose = (e) => console.log(e);
 
 const round = (n) => Math.round(n * 100) / 100;
 
-export const downloadVideo = async (url: string, title: string) => {
+// const VIDEO = ["webp", "mp4", "flv", "mov"];
+
+// const AUDIO = ["mp3", "wav"];
+
+// const IMAGE = ["gif"];
+
+export const downloadVideo = async (
+  url: string,
+  title: string
+): Promise<Uint8Array> => {
+  if (!url) throw new Error("Url is not supplied");
+
   verbose("[clipper] downloading info");
 
   const filenameInternal = `${encodeURIComponent(title)}`;
-
   const tmpname = `tmp/tmp-${filenameInternal}.mp4`;
 
   verbose("[clipper] downloaded info");
   try {
     console.log(ffmpeg.FS("stat", tmpname));
     verbose("[clipper] using preloaded video");
-    ffmpeg.FS("readFile", tmpname);
   } catch (e) {
     ffmpeg.FS(
       "writeFile",
       `${tmpname}`,
       await fetchFile("clipper/dlVid?url=" + url)
     );
+  } finally {
+    return ffmpeg.FS("readFile", tmpname);
   }
 };
 
 export const clipStream = async (
-  url: string,
+  buffer: Uint8Array,
   title: string,
   start?: number,
   end?: number,
@@ -44,8 +54,7 @@ export const clipStream = async (
   width = 1,
   height = 1,
   onProgress: (proress: { message: string; ratio?: number }) => void = () => {}
-): Promise<string> => {
-  if (!url) throw new Error("Url is not supplied");
+): Promise<Blob> => {
   const dur = Number(end) - Number(start);
   if (isNaN(Number(end)) || isNaN(Number(start))) {
     throw new Error("Invalid start/end time");
@@ -57,17 +66,16 @@ export const clipStream = async (
     const filenameInternal = `${encodeURIComponent(title)}`;
     const tmpname = `tmp/tmp-${filenameInternal}.mp4`;
 
-    onProgress({
-      message: "Downloading Video...",
-    });
-    await downloadVideo(url, title);
-    onProgress({
-      message: "Video Downloaded",
-    });
+    try {
+      ffmpeg.FS("stat", `${tmpname}`);
+    } catch (e) {
+      ffmpeg.FS("writeFile", `${tmpname}`, buffer);
+    }
 
-    const args = ["-i", `${tmpname}`];
-
+    const args: string[] = [];
     if (Number(start ?? 0) > 0) args.push("-ss", Number(start ?? 0).toString());
+
+    args.push("-i", `${tmpname}`);
 
     args.push("-t", dur.toString());
 
@@ -91,25 +99,32 @@ export const clipStream = async (
     }
 
     let extension: string;
+    let mimetype: string;
     switch (type) {
       case "mp4":
-        extension = "mp4";
+        extension = "video/mp4";
+        mimetype = "mp4";
         args.push("-movflags", "frag_keyframe+empty_moov");
         break;
       case "flv":
         extension = "flv";
+        mimetype = "video/flv";
         break;
       case "mov":
         extension = "mov";
+        mimetype = "video/mov";
         break;
       case "webp":
         extension = "webp";
+        mimetype = "image/webp";
         break;
       case "mp3":
         extension = "mp3";
+        mimetype = "audio/mp3";
         break;
       case "wav":
         extension = "wav";
+        mimetype = "audio/wav";
         break;
       default:
         verbose(`Saving temp file for ${title}`);
@@ -133,25 +148,36 @@ export const clipStream = async (
           `fps=${fps},split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`
         );
         extension = "gif";
+        mimetype = "image/gif";
         break;
     }
     args.push(`out-${filenameInternal}.${extension}`);
 
     ffmpeg.setProgress(({ ratio }) => {
       onProgress({
-        message: "Convert",
+        message: "Converting...",
         ratio: Math.round(ratio * 100),
       });
     });
     await ffmpeg.run(...args);
     ffmpeg.setProgress(() => {});
 
+    onProgress({
+      message: "Saving Video...",
+    });
+
     const file = ffmpeg.FS(
       "readFile",
       `out-${filenameInternal}.${extension}`
     ) as Uint8Array;
 
-    return bytesToBase64(file);
+    onProgress({
+      message: "Done !",
+    });
+
+    return new File([file], `${filename ?? filenameInternal}.${extension}`, {
+      type: mimetype,
+    });
   } catch (error) {
     console.log(error);
     throw new Error("Oops");
