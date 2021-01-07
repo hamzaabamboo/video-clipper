@@ -14,7 +14,7 @@ const calculateFps = (w: number, h: number, fps: number, length: number) => {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const DEFAULT_HEIGHT = 480;
+const DEFAULT_WIDTH = 720;
 type SourceType = "youtube" | "upload";
 const App = () => {
   const [url, setUrl] = useState<string>(
@@ -168,7 +168,7 @@ const App = () => {
         width: videoRef.current?.videoWidth ?? 0,
         height: videoRef.current?.videoHeight ?? 0,
       });
-      setResScale(DEFAULT_HEIGHT / videoRef.current?.videoHeight ?? 1);
+      setResScale(DEFAULT_WIDTH / videoRef.current?.videoWidth ?? 1);
       cropperRef.current.resetCrop();
       setVolume(50);
     };
@@ -291,7 +291,7 @@ const App = () => {
     <div className="flex justify-center flex-col items-center min-h-screen w-screen py-2">
       <div className="flex justify-center flex-col items-center py-2 w-full">
         <h1 className="text-6xl font-bold text-center">
-          Video Clipping Tool V1.5!
+          Video Clipping Tool V1.6!
         </h1>
         <Cropper
           ref={cropperRef}
@@ -351,7 +351,7 @@ const App = () => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  className="p-2 mr-2 rounded border w-full border-black"
+                  className="p-2 mr-2 rounded border w-full border-black block text-overflow-ellipsis overflow-hidden whitespace-nowrap"
                   accept="video/*, .mkv"
                 />
                 <button
