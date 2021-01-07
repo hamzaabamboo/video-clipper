@@ -6,6 +6,7 @@ import qs from "querystring";
 import "./styles/tailwind.css";
 import "rc-slider/assets/index.css";
 import { clipStream, ffmpeg } from "./clipper";
+import { Dimension, Coordinate, Cropper } from "./components/Cropper";
 
 const calculateFps = (w: number, h: number, fps: number, length: number) => {
   return (4 * (w * h * fps * length)) / 8;
@@ -13,16 +14,7 @@ const calculateFps = (w: number, h: number, fps: number, length: number) => {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-interface Coordinate {
-  x: number;
-  y: number;
-}
-
-interface Dimension {
-  width: number;
-  height: number;
-}
-export default () => {
+const App = () => {
   const [url, setUrl] = useState<string>(
     "https://www.youtube.com/watch?v=ebSce4xUjo0"
   );
@@ -35,21 +27,15 @@ export default () => {
   const [loop, setLoop] = useState<boolean>(true);
   const [res, setRes] = useState<string>("");
   const [isFFMpegLoading, setFFMpegLoading] = useState(false);
-  const [convertProgress, setConvertProgress] = useState<number>(0);
+  const [convertProgress, setConvertProgress] = useState<{
+    message: string;
+    ratio?: number;
+  }>();
 
   const [dimension, setDimensions] = useState<Dimension>({
     width: 1,
     height: 1,
   });
-  const cropPositionRef = useRef<Coordinate>({
-    x: 0,
-    y: 0,
-  });
-  const cropDimensionRef = useRef<Dimension>({
-    width: 1,
-    height: 1,
-  });
-
   const [cropDimension, setCropDimesion] = useState<Dimension>({
     width: 1,
     height: 1,
@@ -69,8 +55,7 @@ export default () => {
   const [maxQuality, setMaxQuality] = useState<boolean>(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const playerRef = useRef<HTMLDivElement>(null);
-  const cropperRef = useRef<HTMLDivElement>(null);
+  const cropperRef = useRef<any>(null);
 
   const dlUrl = useMemo(() => {
     return (
@@ -142,7 +127,6 @@ export default () => {
 
   useEffect(() => {
     setUrl(localStorage.getItem("videoUrl") ?? "");
-    updateCrop();
     let done = false;
     const f = async () => {
       await axios.get("/clipper/ping");
@@ -155,7 +139,7 @@ export default () => {
     };
     const g = async () => {
       setFFMpegLoading(true);
-      await ffmpeg.load();
+      if (!ffmpeg?.isLoaded()) await ffmpeg.load();
       console.log("FFMpeg Ready!");
       setFFMpegLoading(false);
     };
@@ -219,9 +203,7 @@ export default () => {
         width: bestVideo.width,
         height: bestVideo.height,
       });
-      cropPositionRef.current = { x: 0, y: 0 };
-      cropDimensionRef.current = { width: 1, height: 1 };
-      resetCrop();
+      cropperRef.current.resetCrop();
       setVolume(50);
     } catch {
       setVideoSrc(undefined);
@@ -231,9 +213,6 @@ export default () => {
   const getGif = async () => {
     if (!video) return;
     try {
-      ffmpeg.setProgress(({ ratio }) => {
-        setConvertProgress(ratio);
-      });
       const r = await clipStream(
         url,
         video?.title,
@@ -246,150 +225,12 @@ export default () => {
         cropPosition.x,
         cropPosition.y,
         cropDimension.width,
-        cropDimension.height
+        cropDimension.height,
+        (progress) => setConvertProgress(progress)
       );
       setRes("data:image/gif;base64, " + r);
     } finally {
-      ffmpeg.setProgress(() => {});
     }
-  };
-
-  const setCrop = () => {
-    setCropDimesion(cropDimensionRef.current);
-    setCropPosition(cropPositionRef.current);
-  };
-
-  const handleDrag = (type: "pos" | "size" | "all") => (
-    event: React.MouseEvent<HTMLDivElement, MouseEvent>
-  ) => {
-    const target = event.nativeEvent.target as HTMLDivElement;
-    let shiftX =
-      event.nativeEvent.clientX - target.getBoundingClientRect().left;
-    let shiftY = event.nativeEvent.clientY - target.getBoundingClientRect().top;
-    event.nativeEvent.stopPropagation();
-    event.nativeEvent.preventDefault();
-    const t = playerRef.current as HTMLDivElement;
-
-    const rect = t.getBoundingClientRect();
-
-    function onMouseEnter(event: MouseEvent) {
-      event.stopPropagation();
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }
-
-    function onMouseMove(event: MouseEvent) {
-      if (type === "pos") {
-        const x2 =
-          cropPositionRef.current.x +
-          rect.left * cropDimensionRef.current.width;
-        const y2 =
-          cropPositionRef.current.y +
-          rect.top * cropDimensionRef.current.height;
-        const xOff = event.clientX - shiftX - rect.left;
-        const yOff = event.clientY - shiftY - rect.top;
-
-        const cropper = cropperRef.current as HTMLDivElement;
-
-        const xDim = (x2 - xOff) / rect.width;
-        const yDim = (y2 - yOff) / rect.height;
-
-        if (yOff > 0 && yOff < y2) {
-          cropDimensionRef.current.height = yDim / rect.height;
-          cropper.style.height = yDim * 100 + "%";
-          cropPositionRef.current.y = yOff / rect.height;
-          cropper.style.top = yOff + "px";
-        }
-        if (xOff > 0 && xOff < x2) {
-          cropDimensionRef.current.width = xDim / rect.width;
-          cropper.style.width = xDim * 100 + "%";
-          cropPositionRef.current.x = xOff / rect.height;
-          cropper.style.left = xOff + "px";
-        }
-      }
-      if (type === "all") {
-        const xOff = event.clientX - shiftX - rect.left;
-        const yOff = event.clientY - shiftY - rect.top;
-        const cropper = cropperRef.current as HTMLDivElement;
-        if (
-          yOff > 0 &&
-          yOff + cropDimensionRef.current.height * rect.height < rect.height
-        ) {
-          cropPositionRef.current.y = yOff / rect.height;
-          cropper.style.top = yOff + "px";
-        }
-        if (
-          xOff > 0 &&
-          xOff + cropDimensionRef.current.width * rect.width < rect.width
-        ) {
-          cropPositionRef.current.x = xOff / rect.width;
-          cropper.style.left = xOff + "px";
-        }
-      }
-      if (type === "size") {
-        const xOff =
-          event.clientX -
-          rect.left -
-          cropPositionRef.current.x * rect.width +
-          event.movementX;
-        const yOff =
-          event.clientY -
-          rect.top -
-          cropPositionRef.current.y * rect.height +
-          event.movementY;
-        const cropper = cropperRef.current as HTMLDivElement;
-        const xDim = xOff / rect.width;
-        const yDim = yOff / rect.height;
-        console.log(xDim, yDim);
-        if (yOff > 0 && yOff < rect.height) {
-          cropDimensionRef.current.height = yDim;
-          cropper.style.height = yDim * 100 + "%";
-        }
-        if (xOff > 0 && xOff < rect.width) {
-          cropDimensionRef.current.width = xDim;
-          cropper.style.width = xDim * 100 + "%";
-        }
-      }
-    }
-
-    // move the ball on mousemove
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseenter", onMouseEnter);
-
-    target.onmouseleave = function () {
-      console.log("upp!!!");
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseenter", onMouseEnter);
-      target.onmouseup = null;
-      target.onmouseleave = null;
-    };
-
-    target.onmouseup = function () {
-      console.log("upp!!!");
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseenter", onMouseEnter);
-      target.onmouseup = null;
-      target.onmouseleave = null;
-    };
-  };
-
-  const resetCrop = () => {
-    cropDimensionRef.current.width = 1;
-    cropPositionRef.current.x = 0;
-    cropDimensionRef.current.height = 1;
-    cropPositionRef.current.y = 0;
-
-    updateCrop();
-  };
-
-  const updateCrop = () => {
-    const cropper = cropperRef.current as HTMLDivElement;
-    const rect = playerRef.current?.getBoundingClientRect();
-
-    cropper.style.width = cropDimensionRef.current.width * 100 + "%";
-    cropper.style.left = cropPositionRef.current.x * (rect?.width ?? 0) + "px";
-    cropper.style.height = cropDimensionRef.current.height * 100 + "%";
-    cropper.style.top = cropPositionRef.current.y * (rect?.height ?? 0) + "px";
   };
 
   return (
@@ -398,45 +239,18 @@ export default () => {
         <h1 className="text-6xl font-bold text-center">
           Video Clipping Tool V1.5!
         </h1>
-        <div ref={playerRef} className="m-2 relative w-3/5 ">
-          <div
-            className="absolute z-20"
-            ref={cropperRef}
-            style={{
-              display: isCropping ? "block" : "none",
-            }}
-          >
-            <div
-              className="bg-gray-500 w-full h-full opacity-25 z-30"
-              draggable
-              onMouseDown={handleDrag("all")}
-              onDragStart={() => {
-                return false;
-              }}
-            ></div>
-            <div
-              className="w-8 h-8 rounded-full bg-red-600 opacity-75 absolute z-40"
-              style={{ top: "-1rem", left: "-1rem" }}
-              draggable
-              onMouseDown={handleDrag("pos")}
-              onDragStart={() => {
-                return false;
-              }}
-            ></div>
-            <div
-              className="w-8 h-8 rounded-full bg-red-600 opacity-75 absolute z-40"
-              style={{ bottom: "-1rem", right: "-1rem" }}
-              draggable
-              onMouseDown={handleDrag("size")}
-              onDragStart={() => {
-                return false;
-              }}
-            ></div>
-          </div>
+        <Cropper
+          ref={cropperRef}
+          onUpdateCrop={(position, dimension) => {
+            setCropDimesion(dimension);
+            setCropPosition(position);
+          }}
+          isCropping={isCropping}
+        >
           <video
             ref={videoRef}
             src={video?.url}
-            className="w-full"
+            className="w-full mb-2"
             onVolumeChange={(e) => {
               setVolume((e.target as HTMLVideoElement).volume * 100);
             }}
@@ -452,7 +266,7 @@ export default () => {
             autoPlay
             // controls
           ></video>
-        </div>
+        </Cropper>
         <div className="flex grid gap-2 grid-cols-2 w-4/5 mx-auto">
           <div>
             <div>
@@ -656,16 +470,15 @@ export default () => {
                 </button>
                 <button
                   className="rounded bg-blue-400 p-2 mr-2"
-                  onClick={setCrop}
-                >
-                  Set Crop
-                </button>
-                <button
-                  className="rounded bg-red-400 p-2 mr-2"
-                  onClick={resetCrop}
+                  onClick={() => cropperRef.current.resetCrop()}
                 >
                   Reset Crop
                 </button>
+              </div>
+            </div>
+            <div>
+              <span className="text-lg font-bold mb-2">Quality</span>
+              <div className="flex-row">
                 <button
                   className="rounded bg-blue-400 p-2 mr-2"
                   onClick={() => setMaxQuality((c) => !c)}
@@ -728,12 +541,15 @@ export default () => {
           </div>
         </div>
         <div className="p-2">
-          {convertProgress > 0 &&
-            convertProgress < 1 &&
-            `Converting... ${Math.round(convertProgress * 100)}%`}
+          {convertProgress &&
+            `${convertProgress.message} ${
+              convertProgress.message ? convertProgress.message + "%" : ""
+            }`}
         </div>
         <div className="p-2">{res && <img alt="result gif" src={res} />}</div>
       </div>
     </div>
   );
 };
+
+export default App;

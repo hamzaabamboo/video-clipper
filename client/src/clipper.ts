@@ -42,7 +42,8 @@ export const clipStream = async (
   x = 0,
   y = 0,
   width = 1,
-  height = 1
+  height = 1,
+  onProgress: (proress: { message: string; ratio?: number }) => void = () => {}
 ): Promise<string> => {
   if (!url) throw new Error("Url is not supplied");
   const dur = Number(end) - Number(start);
@@ -54,10 +55,15 @@ export const clipStream = async (
     verbose("[clipper] downloading info");
 
     const filenameInternal = `${encodeURIComponent(title)}`;
-
     const tmpname = `tmp/tmp-${filenameInternal}.mp4`;
 
+    onProgress({
+      message: "Downloading Video...",
+    });
     await downloadVideo(url, title);
+    onProgress({
+      message: "Video Downloaded",
+    });
 
     const args = ["-i", `${tmpname}`];
 
@@ -108,7 +114,15 @@ export const clipStream = async (
       default:
         verbose(`Saving temp file for ${title}`);
         args.push(`tmp/gif-${filenameInternal}.mp4`);
+
+        ffmpeg.setProgress(({ ratio }) => {
+          onProgress({
+            message: `Saving Temporary Video File`,
+            ratio: Math.round(ratio * 100),
+          });
+        });
         await ffmpeg.run(...args);
+        ffmpeg.setProgress(() => {});
 
         verbose(`Creating GIF for ${title}`);
         args.splice(0, args.length);
@@ -123,7 +137,14 @@ export const clipStream = async (
     }
     args.push(`out-${filenameInternal}.${extension}`);
 
+    ffmpeg.setProgress(({ ratio }) => {
+      onProgress({
+        message: "Convert",
+        ratio: Math.round(ratio * 100),
+      });
+    });
     await ffmpeg.run(...args);
+    ffmpeg.setProgress(() => {});
 
     const file = ffmpeg.FS(
       "readFile",
