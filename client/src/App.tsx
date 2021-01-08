@@ -5,7 +5,7 @@ import axios from "axios";
 import qs from "querystring";
 import "./styles/tailwind.css";
 import "rc-slider/assets/index.css";
-import { clipStream, downloadVideo, ffmpeg } from "./clipper";
+import { clipStream, downloadVideo, ffmpeg, MEDIA_TYPES } from "./clipper";
 import { Dimension, Coordinate, Cropper } from "./components/Cropper";
 
 const calculateFps = (w: number, h: number, fps: number, length: number) => {
@@ -27,11 +27,21 @@ const App = () => {
     url: string;
     title: string;
     type: SourceType;
+    quality: number | "local";
   }>();
+
+  const [videoTitle, setVideoTitle] = useState<string>();
+  const [videoRes, setVideoRes] = useState<any[]>([]);
+  const [videoQuality, setVideoQuality] = useState<number>();
+
   const [clip, setClip] = useState<[number, number]>([0, 0]);
   const [fps, setFps] = useState<number>(30);
   const [loop, setLoop] = useState<boolean>(true);
-  const [res, setRes] = useState<string>("");
+  const [res, setRes] = useState<{
+    src: string;
+    type: string;
+    name: string;
+  }>();
   const [mode, setMode] = useState<SourceType>("youtube");
   const [isFFMpegLoading, setFFMpegLoading] = useState(false);
   const [convertProgress, setConvertProgress] = useState<{
@@ -53,53 +63,22 @@ const App = () => {
     y: 0,
   });
 
+  const [outType, setOutType] = useState<keyof typeof MEDIA_TYPES>("gif");
+
   const [resScale, setResScale] = useState<number>(1);
   const [resFps, setResFps] = useState<number>(30);
 
   const [isPlaying, _setPlaying] = useState<boolean>(false);
   const [isCropping, setCropping] = useState<boolean>(false);
 
-  const [maxQuality, setMaxQuality] = useState<boolean>(false);
-
   const videoRef = useRef<HTMLVideoElement>(null);
   const cropperRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const dlUrl = useMemo(() => {
-    return (
-      url &&
-      clip &&
-      "clip?" +
-        qs.encode({
-          url,
-          start: clip[0],
-          end: clip[1],
-          fps: resFps,
-          scale: resScale,
-          ...(isCropping ? cropDimension : {}),
-          ...(isCropping ? cropPosition : {}),
-          max: maxQuality,
-        })
-    );
-  }, [
-    url,
-    clip,
-    resFps,
-    resScale,
-    cropDimension,
-    cropPosition,
-    isCropping,
-    maxQuality,
-  ]);
-
   const size = useMemo(() => {
     return calculateFps(
-      (maxQuality ? 1980 : dimension.width) *
-        (isCropping ? cropDimension.width : 1) *
-        resScale,
-      (maxQuality ? 1980 : dimension.height) *
-        (isCropping ? cropDimension.height : 1) *
-        resScale,
+      dimension.width * (isCropping ? cropDimension.width : 1) * resScale,
+      dimension.height * (isCropping ? cropDimension.height : 1) * resScale,
       resFps,
       clip[1] - clip[0]
     );
@@ -108,7 +87,6 @@ const App = () => {
     resFps,
     resScale,
     isCropping,
-    maxQuality,
     dimension.width,
     cropDimension.width,
     dimension.height,
@@ -168,7 +146,11 @@ const App = () => {
         width: videoRef.current?.videoWidth ?? 0,
         height: videoRef.current?.videoHeight ?? 0,
       });
-      setResScale(DEFAULT_WIDTH / videoRef.current?.videoWidth ?? 1);
+      setResScale(
+        (DEFAULT_WIDTH / videoRef.current?.videoWidth > 1
+          ? 1
+          : DEFAULT_WIDTH / videoRef.current?.videoWidth) ?? 1
+      );
       cropperRef.current.resetCrop();
       setVolume(50);
     };
@@ -208,26 +190,37 @@ const App = () => {
     };
   }, [video]);
 
-  const getVid = async () => {
+  useEffect(() => {
+    const info = videoRes.find((e) => e.itag === videoQuality);
+    console.log(info, videoQuality, videoRes);
+    if (!videoQuality || !info) return;
+    setVideoSrc({
+      url: info.url,
+      title: videoTitle ?? "",
+      type: "youtube",
+      quality: videoQuality,
+    });
+    setFps(info.fps);
+  }, [videoRes, videoQuality, videoTitle]);
+
+  const getVidData = async () => {
     try {
       localStorage.setItem("videoUrl", url);
       const {
-        data: { title, data, bestVideo },
+        data: { title, allFormats },
       } = await axios.get("/clipper/vid?" + qs.encode({ url }));
-      console.log(data);
-      setVideoSrc({
-        url: data.url,
-        title,
-
-        type: "youtube",
-      });
-      setFps(data.fps);
+      console.log(allFormats);
+      setVideoTitle(title);
+      setVideoRes(
+        allFormats.filter((e) => e.container === "mp4" && e.hasVideo)
+      );
+      setVideoQuality(22);
     } catch {
       setVideoSrc(undefined);
     }
   };
 
-  const getGif = async () => {
+  const convert = async () => {
     if (!video) return;
     try {
       let buffer: Uint8Array;
@@ -247,7 +240,7 @@ const App = () => {
           setConvertProgress({
             message: "Downloading Video...",
           });
-          buffer = await downloadVideo(url, video?.title ?? "");
+          buffer = await downloadVideo(url, video?.title ?? "", video.quality);
           setConvertProgress({
             message: "Video Downloaded",
           });
@@ -258,8 +251,9 @@ const App = () => {
         video?.title,
         clip[0],
         clip[1],
-        "gif",
-        "bobo",
+        outType,
+        video.quality,
+        undefined,
         resFps,
         resScale,
         cropPosition.x,
@@ -268,7 +262,11 @@ const App = () => {
         cropDimension.height,
         (progress) => setConvertProgress(progress)
       );
-      setRes(URL.createObjectURL(r));
+      setRes({
+        src: URL.createObjectURL(r.file),
+        type: r.type,
+        name: r.name,
+      });
     } catch (e) {
       setConvertProgress({
         message: "Something Went Wrong... " + e,
@@ -283,6 +281,7 @@ const App = () => {
       url: URL.createObjectURL(video),
       title: video.name.split(".").slice(undefined, -1).join(""),
       type: "upload",
+      quality: "local",
     });
     if (!videoRef.current) return;
   };
@@ -291,7 +290,7 @@ const App = () => {
     <div className="flex justify-center flex-col items-center min-h-screen w-screen py-2">
       <div className="flex justify-center flex-col items-center py-2 w-full">
         <h1 className="text-6xl font-bold text-center">
-          Video Clipping Tool V1.6!
+          Video Clipping Tool V1.7!
         </h1>
         <Cropper
           ref={cropperRef}
@@ -340,10 +339,21 @@ const App = () => {
                 />
                 <button
                   className="rounded border bg-red-500 mr-2 my-2 p-2 text-white"
-                  onClick={() => getVid()}
+                  onClick={() => getVidData()}
                 >
                   Load video
                 </button>
+                <select
+                  value={videoQuality}
+                  onChange={(e) => setVideoQuality(Number(e.target.value))}
+                >
+                  {videoRes.map((e) => (
+                    <option key={e.itag} value={e.itag}>
+                      {e.quality} {e.qualityLabel ? `(${e.qualityLabel})` : ""}{" "}
+                      {e.hasVideo && "Video"} {e.hasAudio && "Audio"}
+                    </option>
+                  ))}
+                </select>
               </div>
             ) : (
               <div>
@@ -561,26 +571,29 @@ const App = () => {
               </div>
             </div>
             <div>
-              <span className="text-lg font-bold mb-2">Quality</span>
-              <div className="flex-row">
-                <button
-                  className="rounded bg-blue-400 p-2 mr-2"
-                  onClick={() => setMaxQuality((c) => !c)}
-                >
-                  {maxQuality ? "Max Quality" : "Normal Quality"}
-                </button>
-              </div>
+              <select
+                value={outType}
+                onChange={(e) =>
+                  setOutType(e.target.value as keyof typeof MEDIA_TYPES)
+                }
+              >
+                {Object.keys(MEDIA_TYPES).map((e) => (
+                  <option key={e} value={e}>
+                    {e.toUpperCase()}
+                  </option>
+                ))}
+              </select>
             </div>
             <span>
               Approx size: {size / 1000000} MB (
               {Math.round(
-                (maxQuality ? 1980 : dimension.width) *
+                dimension.width *
                   (isCropping ? cropDimension.width : 1) *
                   resScale
               )}
               x
               {Math.round(
-                (maxQuality ? 1080 : dimension.height) *
+                dimension.height *
                   (isCropping ? cropDimension.height : 1) *
                   resScale
               )}
@@ -591,36 +604,21 @@ const App = () => {
                 className={`rounded p-2 ${
                   !isFFMpegLoading ? "bg-blue-400" : "bg-gray-500"
                 }`}
-                onClick={getGif}
+                onClick={convert}
                 disabled={isFFMpegLoading}
               >
-                Generate GIF !
+                Generate !
               </button>
-              {dlUrl && (
-                <>
-                  <a
-                    className="mx-2"
-                    href={"/clipper/" + dlUrl + "&download=true"}
-                    target="__blank"
-                  >
-                    Download GIF !
-                  </a>
-                  <a
-                    className="mx-2"
-                    href={"/clipper/" + dlUrl + "&type=mp3&download=true"}
-                    target="__blank"
-                  >
-                    Download MP3 !
-                  </a>
-                  <a
-                    className="mx-2"
-                    href={"/clipper/" + dlUrl + "&type=mp4&download=true"}
-                    target="__blank"
-                  >
-                    Download MP4 !
-                  </a>
-                </>
-              )}
+              <a
+                className={`rounded p-2 mx-2 ${
+                  res?.src ? "bg-blue-600" : "bg-gray-500"
+                }`}
+                href={res?.src}
+                target="__blank"
+                download={res?.name}
+              >
+                Download !
+              </a>
             </div>
           </div>
         </div>
@@ -632,7 +630,17 @@ const App = () => {
                 : ""
             }`}
         </div>
-        <div className="p-2">{res && <img alt="result gif" src={res} />}</div>
+        <div className="p-2">
+          {res?.type === "image" ? (
+            <img alt={res?.name} src={res?.src} />
+          ) : res?.type === "audio" ? (
+            <audio controls>
+              <source src={res?.src}></source>
+            </audio>
+          ) : (
+            <video src={res?.src} controls></video>
+          )}
+        </div>
       </div>
     </div>
   );

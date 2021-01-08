@@ -36,7 +36,8 @@ export class ClipperController {
       return {
         data: info.formats[0],
         title: info.videoDetails.title,
-        bestVideo: info.formats.find(t => t.itag === 18),
+        bestVideo: info.formats.find((t) => t.itag === 18),
+        allFormats: info.formats,
       };
     } catch (error) {
       return new HttpException('Oops', 400);
@@ -46,17 +47,18 @@ export class ClipperController {
   @Get('dlVid')
   public async proxyDownload(
     @Query('url') url: string,
+    @Query('quality') quality: string,
     @Res() res: Response,
-  ) { 
+  ) {
     if (!url) throw new HttpException('Url is not supplied', 400);
     const vid = url;
     try {
-     await ytdl.getInfo(vid, {
+      const info = await ytdl.getInfo(vid, {
         requestOptions: {
-          quality: 'highest',
+          quality: quality,
         },
       });
-      ytdl(url).pipe(res);
+      ytdl.downloadFromInfo(info, { quality: quality }).pipe(res);
     } catch (error) {
       return new HttpException('Oops', 400);
     }

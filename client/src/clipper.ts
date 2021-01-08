@@ -14,16 +14,55 @@ const round = (n) => Math.round(n * 100) / 100;
 
 // const IMAGE = ["gif"];
 
+export type QualityLabel = number | "local";
+export const MEDIA_TYPES = {
+  mp4: {
+    type: "video",
+    extension: "mp4",
+    mimetype: "video/mp4",
+  },
+  webp: {
+    type: "video",
+    extension: "webp",
+    mimetype: "video/webp",
+  },
+  flv: {
+    type: "video",
+    extension: "flv",
+    mimetype: "video/flv",
+  },
+  mov: {
+    type: "video",
+    extension: "mov",
+    mimetype: "video/mov",
+  },
+  mp3: {
+    type: "audio",
+    extension: "mp3",
+    mimetype: "audio/mp3",
+  },
+  wav: {
+    type: "audio",
+    extension: "wav",
+    mimetype: "audio/wav",
+  },
+  gif: {
+    type: "image",
+    extension: "gif",
+    mimetype: "image/gif",
+  },
+};
 export const downloadVideo = async (
   url: string,
-  title: string
+  title: string,
+  quality: QualityLabel
 ): Promise<Uint8Array> => {
   if (!url) throw new Error("Url is not supplied");
 
   verbose("[clipper] downloading info");
 
   const filenameInternal = `${encodeURIComponent(title)}`;
-  const tmpname = `tmp/tmp-${filenameInternal}.mp4`;
+  const tmpname = `tmp/tmp-${filenameInternal}_${quality}.mp4`;
 
   verbose("[clipper] downloaded info");
   try {
@@ -33,7 +72,7 @@ export const downloadVideo = async (
     ffmpeg.FS(
       "writeFile",
       `${tmpname}`,
-      await fetchFile("clipper/dlVid?url=" + url)
+      await fetchFile("clipper/dlVid?url=" + url + "&quality=" + quality)
     );
   } finally {
     return ffmpeg.FS("readFile", tmpname);
@@ -45,7 +84,8 @@ export const clipStream = async (
   title: string,
   start?: number,
   end?: number,
-  type = "gif",
+  type: keyof typeof MEDIA_TYPES = "gif",
+  quality?: number | "local",
   filename?: string,
   fps = 30,
   scale = 1,
@@ -54,8 +94,11 @@ export const clipStream = async (
   width = 1,
   height = 1,
   onProgress: (proress: { message: string; ratio?: number }) => void = () => {}
-): Promise<Blob> => {
+): Promise<{ file: Blob; type: string; name: string }> => {
   const dur = Number(end) - Number(start);
+  if (type === "gif" && dur > 60) {
+    throw new Error("Duration too long");
+  }
   if (isNaN(Number(end)) || isNaN(Number(start))) {
     throw new Error("Invalid start/end time");
   }
@@ -63,8 +106,11 @@ export const clipStream = async (
   try {
     verbose("[clipper] downloading info");
 
+    const { extension, mimetype, type: outType } = MEDIA_TYPES[type];
+
     const filenameInternal = `${encodeURIComponent(title)}`;
-    const tmpname = `tmp/tmp-${filenameInternal}.mp4`;
+    const tmpname = `tmp/tmp-${filenameInternal}_${quality}.mp4`;
+    const outname = `out-${filenameInternal}_${quality}_${start}_${end}_${scale}_${fps}_${x}_${y}_${width}_${height}.${extension}`;
 
     try {
       ffmpeg.FS("stat", `${tmpname}`);
@@ -72,112 +118,102 @@ export const clipStream = async (
       ffmpeg.FS("writeFile", `${tmpname}`, buffer);
     }
 
-    const args: string[] = [];
-    if (Number(start ?? 0) > 0) args.push("-ss", Number(start ?? 0).toString());
+    let file: Uint8Array;
+    try {
+      onProgress({
+        message: "Loading Video...",
+      });
+      ffmpeg.FS("stat", outname);
+      onProgress({
+        message: "Done...",
+      });
+    } catch {
+      const args: string[] = [];
+      if (Number(start ?? 0) > 0)
+        args.push("-ss", Number(start ?? 0).toString());
 
-    args.push("-i", `${tmpname}`);
+      args.push("-i", `${tmpname}`);
 
-    args.push("-t", dur.toString());
+      args.push("-t", dur.toString());
 
-    if (type !== "mp3") {
-      const filters: string[] = [];
-      if (
-        Number(x) >= 0 &&
-        Number(y) >= 0 &&
-        Number(width) > 0 &&
-        Number(height) > 0
-      ) {
-        filters.push(
-          `crop=${round(width)}*in_w:${round(height)}*in_h:${round(
-            x
-          )}*in_w:${round(y)}*in_h`
-        );
+      if (type !== "mp3") {
+        const filters: string[] = [];
+        if (
+          Number(x) >= 0 &&
+          Number(y) >= 0 &&
+          Number(width) > 0 &&
+          Number(height) > 0
+        ) {
+          filters.push(
+            `crop=${round(width)}*in_w:${round(height)}*in_h:${round(
+              x
+            )}*in_w:${round(y)}*in_h`
+          );
+        }
+
+        filters.push(`scale=${scale}*in_w:-2`);
+        args.push("-vf", filters.join(","));
       }
 
-      filters.push(`scale=${scale}*in_w:-2`);
-      args.push("-vf", filters.join(","));
-    }
+      switch (type) {
+        case "mp4":
+          // args.push("-movflags", "frag_keyframe+empty_moov");
+          break;
+        case "gif":
+          verbose(`Saving temp file for ${title}`);
 
-    let extension: string;
-    let mimetype: string;
-    switch (type) {
-      case "mp4":
-        extension = "video/mp4";
-        mimetype = "mp4";
-        args.push("-movflags", "frag_keyframe+empty_moov");
-        break;
-      case "flv":
-        extension = "flv";
-        mimetype = "video/flv";
-        break;
-      case "mov":
-        extension = "mov";
-        mimetype = "video/mov";
-        break;
-      case "webp":
-        extension = "webp";
-        mimetype = "image/webp";
-        break;
-      case "mp3":
-        extension = "mp3";
-        mimetype = "audio/mp3";
-        break;
-      case "wav":
-        extension = "wav";
-        mimetype = "audio/wav";
-        break;
-      default:
-        verbose(`Saving temp file for ${title}`);
-        args.push(`tmp/gif-${filenameInternal}.mp4`);
+          const gifName = `tmp/gif-${filenameInternal}_${quality}_${start}_${end}_${scale}_${fps}_${x}_${y}_${width}_${height}.mp4`;
 
-        ffmpeg.setProgress(({ ratio }) => {
-          onProgress({
-            message: `Saving Temporary Video File`,
-            ratio: Math.round(ratio * 100),
+          args.push(gifName);
+
+          ffmpeg.setProgress(({ ratio }) => {
+            onProgress({
+              message: `Saving Temporary Video File`,
+              ratio: Math.round(ratio * 100),
+            });
           });
+          await ffmpeg.run(...args);
+          ffmpeg.setProgress(() => {});
+          verbose(`Creating GIF for ${title}`);
+          args.splice(0, args.length);
+          args.push(
+            "-i",
+            gifName,
+            "-vf",
+            `fps=${fps},split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`
+          );
+          break;
+      }
+
+      args.push(outname);
+
+      ffmpeg.setProgress(({ ratio }) => {
+        onProgress({
+          message: "Converting...",
+          ratio: Math.round(ratio * 100),
         });
-        await ffmpeg.run(...args);
-        ffmpeg.setProgress(() => {});
-
-        verbose(`Creating GIF for ${title}`);
-        args.splice(0, args.length);
-        args.push(
-          "-i",
-          `tmp/gif-${filenameInternal}.mp4`,
-          "-vf",
-          `fps=${fps},split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`
-        );
-        extension = "gif";
-        mimetype = "image/gif";
-        break;
-    }
-    args.push(`out-${filenameInternal}.${extension}`);
-
-    ffmpeg.setProgress(({ ratio }) => {
-      onProgress({
-        message: "Converting...",
-        ratio: Math.round(ratio * 100),
       });
-    });
-    await ffmpeg.run(...args);
-    ffmpeg.setProgress(() => {});
+      await ffmpeg.run(...args);
+      ffmpeg.setProgress(() => {});
 
-    onProgress({
-      message: "Saving Video...",
-    });
+      onProgress({
+        message: "Saving Video...",
+      });
 
-    const file = ffmpeg.FS(
-      "readFile",
-      `out-${filenameInternal}.${extension}`
-    ) as Uint8Array;
+      onProgress({
+        message: "Done !",
+      });
+    }
 
-    onProgress({
-      message: "Done !",
-    });
+    file = ffmpeg.FS("readFile", outname) as Uint8Array;
 
-    return new File([file], `${filename ?? filenameInternal}.${extension}`, {
-      type: mimetype,
-    });
+    return {
+      file: new File([file], `${filename ?? filenameInternal}.${extension}`, {
+        type: mimetype,
+      }),
+      type: outType,
+      name: `${filename ?? filenameInternal}.${extension}`,
+    };
   } catch (error) {
     console.log(error);
     throw new Error("Oops");
