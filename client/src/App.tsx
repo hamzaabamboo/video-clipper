@@ -41,6 +41,7 @@ const App = () => {
     src: string;
     type: string;
     name: string;
+    size: number;
   }>();
   const [mode, setMode] = useState<SourceType>("youtube");
   const [isFFMpegLoading, setFFMpegLoading] = useState(false);
@@ -266,6 +267,7 @@ const App = () => {
         src: URL.createObjectURL(r.file),
         type: r.type,
         name: r.name,
+        size: r.file.size,
       });
     } catch (e) {
       setConvertProgress({
@@ -571,6 +573,7 @@ const App = () => {
               </div>
             </div>
             <div>
+              <h3 className="text-lg font-bold mb-2">Output Format</h3>
               <select
                 value={outType}
                 onChange={(e) =>
@@ -584,22 +587,8 @@ const App = () => {
                 ))}
               </select>
             </div>
-            <span>
-              Approx size: {size / 1000000} MB (
-              {Math.round(
-                dimension.width *
-                  (isCropping ? cropDimension.width : 1) *
-                  resScale
-              )}
-              x
-              {Math.round(
-                dimension.height *
-                  (isCropping ? cropDimension.height : 1) *
-                  resScale
-              )}
-              px)
-            </span>
             <div>
+              <h3 className="text-lg font-bold mb-2">Convert</h3>
               <button
                 className={`rounded p-2 ${
                   !isFFMpegLoading ? "bg-blue-400" : "bg-gray-500"
@@ -607,7 +596,7 @@ const App = () => {
                 onClick={convert}
                 disabled={isFFMpegLoading}
               >
-                Generate !
+                Convert !
               </button>
               <a
                 className={`rounded p-2 mx-2 ${
@@ -619,6 +608,7 @@ const App = () => {
               >
                 Download !
               </a>
+              {Math.round((res?.size ?? 0) / 10000) / 100} MB
             </div>
           </div>
         </div>
