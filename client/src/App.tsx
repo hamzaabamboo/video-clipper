@@ -1,18 +1,23 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Range } from "rc-slider";
-import { Slider } from "./components/Slider";
+import React, { useEffect, useRef, useState } from "react";
+
 import axios from "axios";
 import qs from "querystring";
-import "./styles/tailwind.css";
+import { Range } from "rc-slider";
 import "rc-slider/assets/index.css";
+
 import { clipStream, downloadVideo, ffmpeg, MEDIA_TYPES } from "./clipper";
-import { Dimension, Coordinate, Cropper } from "./components/Cropper";
+import { Button } from "./components/Button";
+import { Coordinate, Cropper, Dimension } from "./components/Cropper";
+import { Select } from "./components/forms/Select";
+import { Textfield } from "./components/forms/Textfield";
+import { Section } from "./components/Section";
+import { Slider } from "./components/forms/Slider";
 
-const calculateFps = (w: number, h: number, fps: number, length: number) => {
-  return (4 * (w * h * fps * length)) / 8;
-};
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+import "./styles/tailwind.css";
+import { sleep } from "./utils/sleep";
+import { roundToNDecimalPlaces } from "./utils/roundToNDecimal";
+import { Typography } from "./components/Typography";
+import { NumberField } from "./components/forms/NumberField";
 
 const DEFAULT_WIDTH = 720;
 type SourceType = "youtube" | "upload";
@@ -22,7 +27,7 @@ const App = () => {
   );
   const [duration, setDuration] = useState<number>(0);
   const [progress, setProgress] = useState<number>(0);
-  const [volume, setVolume] = useState<number>(0);
+  const [volume, setVolume] = useState<number>(50);
   const [video, setVideoSrc] = useState<{
     url: string;
     title: string;
@@ -51,8 +56,8 @@ const App = () => {
   }>();
 
   const [dimension, setDimensions] = useState<Dimension>({
-    width: 1,
-    height: 1,
+    width: 0,
+    height: 0,
   });
   const [cropDimension, setCropDimesion] = useState<Dimension>({
     width: 1,
@@ -64,6 +69,7 @@ const App = () => {
     y: 0,
   });
 
+  const [outFilename, setOutFilename] = useState<string>();
   const [outType, setOutType] = useState<keyof typeof MEDIA_TYPES>("gif");
 
   const [resScale, setResScale] = useState<number>(1);
@@ -76,27 +82,10 @@ const App = () => {
   const cropperRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const size = useMemo(() => {
-    return calculateFps(
-      dimension.width * (isCropping ? cropDimension.width : 1) * resScale,
-      dimension.height * (isCropping ? cropDimension.height : 1) * resScale,
-      resFps,
-      clip[1] - clip[0]
-    );
-  }, [
-    clip,
-    resFps,
-    resScale,
-    isCropping,
-    dimension.width,
-    cropDimension.width,
-    dimension.height,
-    cropDimension.height,
-  ]);
-
   const seekingRef = useRef(false);
 
   const setPlaying = (play: boolean) => {
+    if (!videoRef.current?.readyState) return;
     if (play) {
       videoRef.current?.play();
     } else {
@@ -114,29 +103,27 @@ const App = () => {
 
   useEffect(() => {
     setUrl(localStorage.getItem("videoUrl") ?? "");
+    setVolume(Number(localStorage.getItem("volume")) ?? 0);
     let done = false;
-    const f = async () => {
+    const ping = async () => {
       await axios.get("/clipper/ping");
       await sleep(10000);
       if (!done) {
-        await f();
+        await ping();
       } else {
-        console.log("bye");
       }
     };
-    const g = async () => {
+    const initFFmpeg = async () => {
       setFFMpegLoading(true);
       if (!ffmpeg?.isLoaded()) await ffmpeg.load();
       console.log("FFMpeg Ready!");
       setFFMpegLoading(false);
     };
-    f();
-    g();
+    ping();
+    initFFmpeg();
     if (!videoRef.current) return;
-    videoRef.current.ondurationchange = () => {
-      setDuration(Number(videoRef.current?.duration ?? 0));
-      setClip([0, Number(videoRef.current?.duration)]);
-    };
+    videoRef.current.volume = Number(localStorage.getItem("volume")) / 100;
+
     videoRef.current.onloadedmetadata = () => {
       setPlaying(true);
       if (!videoRef.current) return;
@@ -152,15 +139,20 @@ const App = () => {
           ? 1
           : DEFAULT_WIDTH / videoRef.current?.videoWidth) ?? 1
       );
-      cropperRef.current.resetCrop();
-      setVolume(50);
+      console.log(Number(localStorage.getItem("volume")) / 100);
+      videoRef.current.volume = Number(localStorage.getItem("volume")) / 100;
+    };
+
+    videoRef.current.ondurationchange = () => {
+      setDuration(Number(videoRef.current?.duration ?? 0));
+      setClip([0, Number(videoRef.current?.duration)]);
     };
     return () => {
       done = true;
     };
   }, []);
-
   useEffect(() => {
+    localStorage.setItem("volume", String(volume));
     if (!videoRef.current) return;
     videoRef.current.volume = volume / 100;
   }, [volume]);
@@ -177,7 +169,7 @@ const App = () => {
 
   useEffect(() => {
     const toggle = (e: KeyboardEvent) => {
-      if (e.key === " ") {
+      if (e.key === " " && (e.target as HTMLElement).tagName !== "INPUT") {
         if (videoRef.current?.paused) setPlaying(true);
         else setPlaying(false);
         e.preventDefault();
@@ -193,7 +185,6 @@ const App = () => {
 
   useEffect(() => {
     const info = videoRes.find((e) => e.itag === videoQuality);
-    console.log(info, videoQuality, videoRes);
     if (!videoQuality || !info) return;
     setVideoSrc({
       url: info.url,
@@ -210,7 +201,6 @@ const App = () => {
       const {
         data: { title, allFormats },
       } = await axios.get("/clipper/vid?" + qs.encode({ url }));
-      console.log(allFormats);
       setVideoTitle(title);
       setVideoRes(
         allFormats.filter((e) => e.container === "mp4" && e.hasVideo)
@@ -254,7 +244,7 @@ const App = () => {
         clip[1],
         outType,
         video.quality,
-        undefined,
+        outFilename,
         resFps,
         resScale,
         cropPosition.x,
@@ -263,6 +253,10 @@ const App = () => {
         cropDimension.height,
         (progress) => setConvertProgress(progress)
       );
+
+      if (res?.src) {
+        URL.revokeObjectURL(res.src);
+      }
       setRes({
         src: URL.createObjectURL(r.file),
         type: r.type,
@@ -288,348 +282,444 @@ const App = () => {
     if (!videoRef.current) return;
   };
 
+  const download = () => {
+    // Create an invisible A element
+    const a = document.createElement("a");
+    a.style.display = "none";
+    document.body.appendChild(a);
+
+    // Set the HREF to a Blob representation of the data to be downloaded
+    a.href = res?.src ?? "";
+
+    // Use download attribute to set set desired file name
+    a.setAttribute("download", res?.name ?? "");
+
+    // Trigger the download by simulating click
+    a.click();
+
+    a.remove();
+    // Cleanup
+  };
+
   return (
-    <div className="flex justify-center flex-col items-center min-h-screen w-screen py-2">
-      <div className="flex justify-center flex-col items-center py-2 w-full">
-        <h1 className="text-6xl font-bold text-center">
-          Video Clipping Tool V1.7!
-        </h1>
-        <Cropper
-          ref={cropperRef}
-          onUpdateCrop={(position, dimension) => {
-            setCropDimesion(dimension);
-            setCropPosition(position);
-          }}
-          isCropping={isCropping}
-        >
-          <video
-            ref={videoRef}
-            src={video?.url}
-            className="w-full mb-2"
-            onVolumeChange={(e) => {
-              setVolume((e.target as HTMLVideoElement).volume * 100);
-            }}
-            onTimeUpdate={(e) => {
-              setProgress((e.target as HTMLVideoElement).currentTime);
-            }}
-            onPlay={(e) => {
-              if ((e.target as HTMLVideoElement).currentTime >= clip[1]) {
-                setProgress(clip[0]);
-                (e.target as HTMLVideoElement).currentTime = clip[0];
-              }
-            }}
-            autoPlay
-            // controls
-          ></video>
-        </Cropper>
-        <div className="flex grid gap-2 grid-cols-2 w-4/5 mx-auto">
-          <div>
-            <button
-              className="rounded border bg-blue-500 mr-2 my-2 p-2 text-white"
-              onClick={() => setMode(mode === "youtube" ? "upload" : "youtube")}
-            >
-              Change Mode
-            </button>
-            {mode === "youtube" ? (
-              <div>
-                <span className="text-lg font-bold mb-2">Youtube Video</span>
-                <input
-                  type="text"
-                  className="p-2 mr-2 rounded border w-full border-black"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                />
-                <button
-                  className="rounded border bg-red-500 mr-2 my-2 p-2 text-white"
-                  onClick={() => getVidData()}
+    <div className="flex justify-start flex-col items-center min-h-screen w-screen py-2">
+      <div>
+        <Typography size="text-3xl" weight="font-bold" align="text-center">
+          Video Clipping Tool V1.8!
+        </Typography>
+      </div>
+      <div className="flex flex-col lg:flex-row py-2 px-4 w-full lg:h-full">
+        <div className="flex flex-col p-2 w-full lg:w-4/5 justify-start xl:justify-between">
+          <div className="xl:h-full flex flex-col flex-grow-0 xl:justify-center">
+            <div className={`${video?.url ? "" : "hidden"}`}>
+              <Typography size="text-xl" weight="font-bold" align="text-center">
+                Source Video
+              </Typography>
+              <div className="relative">
+                <Cropper
+                  ref={cropperRef}
+                  onUpdateCrop={(position, dimension) => {
+                    setCropDimesion(dimension);
+                    setCropPosition(position);
+                  }}
+                  isCropping={isCropping}
                 >
-                  Load video
-                </button>
-                <select
-                  value={videoQuality}
-                  onChange={(e) => setVideoQuality(Number(e.target.value))}
-                >
-                  {videoRes.map((e) => (
-                    <option key={e.itag} value={e.itag}>
-                      {e.quality} {e.qualityLabel ? `(${e.qualityLabel})` : ""}{" "}
-                      {e.hasVideo && "Video"} {e.hasAudio && "Audio"}
-                    </option>
-                  ))}
-                </select>
+                  <video
+                    ref={videoRef}
+                    src={video?.url}
+                    className="w-full mb-2 "
+                    onVolumeChange={(e) => {
+                      setVolume((e.target as HTMLVideoElement).volume * 100);
+                    }}
+                    onTimeUpdate={(e) => {
+                      setProgress((e.target as HTMLVideoElement).currentTime);
+                    }}
+                    onPlay={(e) => {
+                      if (
+                        (e.target as HTMLVideoElement).currentTime >= clip[1]
+                      ) {
+                        setProgress(clip[0]);
+                        (e.target as HTMLVideoElement).currentTime = clip[0];
+                      }
+                    }}
+                    autoPlay
+                    // controls
+                  ></video>
+                </Cropper>
               </div>
-            ) : (
-              <div>
-                <span className="text-lg font-bold mb-2">Upload Video</span>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="p-2 mr-2 rounded border w-full border-black block text-overflow-ellipsis overflow-hidden whitespace-nowrap"
-                  accept="video/*, .mkv"
-                />
-                <button
-                  className="rounded border bg-red-500 mr-2 my-2 p-2 text-white"
-                  onClick={() => loadVideo()}
+            </div>
+            <div
+              className={`${
+                video?.url ? "hidden" : ""
+              } h-64 xl:h-full flex flex-col justify-center`}
+            >
+              <Typography align="text-center" weight="font-bold" size="text-lg">
+                Please select a video
+              </Typography>
+            </div>
+          </div>
+          <div className="flex flex-col flex-grow-0 justify-center">
+            <Typography align="text-center">
+              {convertProgress &&
+                `${convertProgress.message} ${
+                  (convertProgress.ratio ?? 0) > 0
+                    ? convertProgress.ratio + "%"
+                    : ""
+                }`}
+            </Typography>
+          </div>
+          <div className="xl:h-full flex flex-col flex-grow-0 justify-center">
+            {res?.src ? (
+              <>
+                <Typography
+                  size="text-xl"
+                  weight="font-bold"
+                  align="text-center"
                 >
-                  Upload video
-                </button>
+                  Output
+                </Typography>
+                <div className="flex justify-center">
+                  {res?.type === "image" ? (
+                    <img alt={res?.name} src={res?.src} />
+                  ) : res?.type === "audio" ? (
+                    <audio controls>
+                      <source src={res?.src}></source>
+                    </audio>
+                  ) : (
+                    <video src={res?.src} controls></video>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="h-64 xl:h-full flex flex-col justify-center">
+                <Typography
+                  align="text-center"
+                  weight="font-bold"
+                  size="text-lg"
+                >
+                  Press Convert to Generate Output
+                </Typography>
               </div>
             )}
-            <div>
-              <button
-                className="rounded border bg-blue-500 mr-2 my-2 p-2 text-white"
+          </div>
+        </div>
+        <div className="flex grid gap-2 grid-cols-1 xl:grid-cols-2 w-full lg:w-4/5">
+          <Section main>
+            <Section sub>
+              <div>
+                <Button
+                  color={mode === "youtube" ? "bg-blue-500" : "bg-blue-300"}
+                  fontColor="text-white"
+                  onClick={() => setMode("youtube")}
+                  disabled={mode === "youtube"}
+                >
+                  Youtube Video
+                </Button>
+                <Button
+                  color={mode === "upload" ? "bg-blue-500" : "bg-blue-300"}
+                  fontColor="text-white"
+                  onClick={() => setMode("upload")}
+                  disabled={mode === "upload"}
+                >
+                  Local Video
+                </Button>
+              </div>
+              {mode === "youtube" ? (
+                <div>
+                  <span className="text-lg font-bold mb-2">Enter URL</span>
+                  <Textfield
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                  />
+                  <div className="flex flex-column items-center">
+                    <Button
+                      color="bg-red-500"
+                      fontColor="text-white"
+                      onClick={() => getVidData()}
+                    >
+                      Get Video Data
+                    </Button>
+                    {videoRes.length > 0 && (
+                      <div className="flex-shrink">
+                        <Select
+                          value={videoQuality}
+                          onChange={(e) =>
+                            setVideoQuality(Number(e.target.value))
+                          }
+                        >
+                          {videoRes.map((e) => (
+                            <option key={e.itag} value={e.itag}>
+                              {e.quality}{" "}
+                              {e.qualityLabel ? `(${e.qualityLabel})` : ""}{" "}
+                              {e.hasVideo && "Video"} {e.hasAudio && "Audio"}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <Typography weight="font-bold" size="text-lg">
+                    Choose File
+                  </Typography>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="p-2 mr-2 rounded border w-full border-black block text-overflow-ellipsis overflow-hidden whitespace-nowrap"
+                    accept="video/*, .mkv"
+                  />
+                  <Button
+                    color="bg-red-500"
+                    fontColor="text-white"
+                    onClick={() => loadVideo()}
+                  >
+                    Load video
+                  </Button>
+                </div>
+              )}
+            </Section>
+            <Section sub>
+              <div className="flex flex-col mb-2">
+                <Typography weight="font-bold" size="text-lg">
+                  Progress
+                </Typography>
+                <Slider
+                  step={0.01}
+                  max={clip[1] ?? duration ?? 0}
+                  min={clip[0] ?? 0}
+                  value={roundToNDecimalPlaces(progress, 2)}
+                  onChange={(e) => {
+                    updateProgress(e);
+                  }}
+                />
+                <div className="flex">
+                  <Button
+                    color="bg-blue-200"
+                    onClick={() => {
+                      setClip([progress, clip[1]]);
+                    }}
+                  >
+                    Set Start
+                  </Button>
+                  <Button
+                    color="bg-blue-200"
+                    onClick={() => {
+                      setClip([clip[0], progress]);
+                    }}
+                  >
+                    Set End
+                  </Button>
+                </div>
+              </div>
+              <Typography weight="font-bold" size="text-lg">
+                Trim
+              </Typography>
+              <div className="w-80 flex items-center mb-2">
+                <div className="flex-shrink">
+                  <NumberField
+                    step=".01"
+                    value={roundToNDecimalPlaces(clip[0], 2)}
+                    min={0}
+                    max={clip[1]}
+                    onChange={(e) => {
+                      updateProgress(Number(e.target.value));
+                      setProgress(Number(e.target.value));
+                      setClip([Number(e.target.value), clip[1]]);
+                    }}
+                  />
+                </div>
+                <div className="px-4 w-100 flex-grow">
+                  <Range
+                    allowCross={false}
+                    step={0.01}
+                    min={0}
+                    max={duration}
+                    defaultValue={[0, 1]}
+                    value={clip}
+                    onBeforeChange={() => {
+                      seekingRef.current = true;
+                      videoRef.current?.pause();
+                    }}
+                    onAfterChange={() => {
+                      seekingRef.current = false;
+                      videoRef.current?.pause();
+                    }}
+                    onChange={(r) => {
+                      if (clip[0] !== r[0]) {
+                        updateProgress(r[0]);
+                      } else {
+                        updateProgress(r[1]);
+                      }
+                      setClip(r as [number, number]);
+                    }}
+                  />
+                </div>
+                <div className="flex-shrink">
+                  <NumberField
+                    step=".01"
+                    value={roundToNDecimalPlaces(clip[1], 2)}
+                    min={clip[0]}
+                    max={duration}
+                    onChange={(e) => {
+                      updateProgress(Number(e.target.value));
+                      setClip([clip[0], Number(e.target.value)]);
+                    }}
+                  />
+                </div>
+              </div>
+            </Section>
+            <Section sub>
+              <Button
+                color="bg-blue-500"
+                fontColor="text-white"
                 onClick={() => setPlaying(!isPlaying)}
               >
                 {!isPlaying ? "Play" : "Pause"}
-              </button>
-              <button
-                className="rounded border bg-green-500 mr-2 my-2 p-2 text-white"
+              </Button>
+              <Button
+                color="bg-green-500"
+                fontColor="text-white"
                 onClick={() => setLoop(!loop)}
               >
                 {!loop ? "No Loop" : "Loop"}
-              </button>
-            </div>
-            <div className="w-80 flex items-center mb-2">
-              <input
-                type="number"
-                step=".01"
-                className="p-2 rounded border border-black flex-shrink"
-                value={clip[0]}
-                min={0}
-                max={clip[1]}
-                onChange={(e) => {
-                  updateProgress(Number(e.target.value));
-                  setProgress(Number(e.target.value));
-                  setClip([Number(e.target.value), clip[1]]);
-                }}
-              />
-              <div className="px-4 w-100 flex-grow">
-                <Range
-                  allowCross={false}
-                  step={0.01}
-                  min={0}
-                  max={duration}
-                  defaultValue={[0, 1]}
-                  value={clip}
-                  onBeforeChange={() => {
-                    seekingRef.current = true;
-                    videoRef.current?.pause();
-                  }}
-                  onAfterChange={() => {
-                    seekingRef.current = false;
-                    videoRef.current?.pause();
-                  }}
-                  onChange={(r) => {
-                    if (clip[0] !== r[0]) {
-                      updateProgress(r[0]);
-                    } else {
-                      updateProgress(r[1]);
+              </Button>
+              <div className="flex flex-col">
+                <Typography weight="font-bold" size="text-lg" type="h3">
+                  Volume
+                </Typography>
+                <input
+                  type="range"
+                  max="100"
+                  min="0"
+                  value={volume}
+                  onChange={(e) => setVolume(Number(e.target.value))}
+                  className="p-2"
+                />
+              </div>
+            </Section>
+          </Section>
+          <Section main>
+            <Section sub>
+              <div className="flex flex-col">
+                <Typography weight="font-bold" size="text-lg" type="h3">
+                  Fps
+                </Typography>
+                <div>
+                  <Slider
+                    step={0.01}
+                    max={fps}
+                    min={0}
+                    value={resFps}
+                    onChange={(e) => {
+                      setResFps(e);
+                    }}
+                  />
+                  <Button onClick={() => setResFps(10)}>10fps</Button>
+                  <Button onClick={() => setResFps(15)}>15fps</Button>
+                  <Button onClick={() => setResFps(21)}>21fps</Button>
+                </div>
+                <Typography weight="font-bold" size="text-lg" type="h3">
+                  Scale
+                </Typography>
+                <div>
+                  <Slider
+                    step={0.01}
+                    max={1}
+                    min={0}
+                    value={roundToNDecimalPlaces(resScale, 2)}
+                    onChange={(e) => {
+                      setResScale(e);
+                    }}
+                  />
+                  <Button onClick={() => setResScale(1)}>100%</Button>
+                  <Button onClick={() => setResScale(0.75)}>75%</Button>
+                  <Button onClick={() => setResScale(0.5)}>50%</Button>
+                  <Button onClick={() => setResScale(0.25)}>25%</Button>
+                  {dimension.width > 0 && (
+                    <Typography>
+                      {dimension.width * resScale} x{" "}
+                      {dimension.height * resScale} px
+                    </Typography>
+                  )}
+                </div>
+              </div>
+              <div>
+                <Typography weight="font-bold" size="text-lg" type="h3">
+                  Crop
+                </Typography>
+                <div className="flex-row">
+                  <Button
+                    color="bg-blue-400"
+                    onClick={() => setCropping((c) => !c)}
+                  >
+                    {isCropping ? "No Crop" : "Crop"}
+                  </Button>
+                  <Button
+                    color="bg-red-400"
+                    onClick={() => cropperRef.current.resetCrop()}
+                  >
+                    Reset Crop
+                  </Button>
+                </div>
+              </div>
+            </Section>
+            <Section sub>
+              <Typography weight="font-bold" size="text-lg" type="h3">
+                Output
+              </Typography>
+              <div className="flex flex-row items-center mb-2">
+                <span className="mr-2">Filename</span>
+                <Textfield
+                  value={outFilename}
+                  placeholder={"Leave blank for default video title"}
+                  onChange={(e) => setOutFilename(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-row items-center">
+                <span className="mr-2">Extension</span>
+                <div>
+                  <Select
+                    value={outType}
+                    onChange={(e) =>
+                      setOutType(e.target.value as keyof typeof MEDIA_TYPES)
                     }
-                    setClip(r as [number, number]);
-                  }}
-                />
+                  >
+                    {Object.keys(MEDIA_TYPES).map((e) => (
+                      <option key={e} value={e}>
+                        {e.toUpperCase()}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
               </div>
-              <input
-                type="number"
-                className="p-2 rounded border border-black flex-shrink"
-                step=".01"
-                value={clip[1]}
-                min={clip[0]}
-                max={duration}
-                onChange={(e) => {
-                  updateProgress(Number(e.target.value));
-                  setClip([clip[0], Number(e.target.value)]);
-                }}
-              />
-            </div>
-            <div className="flex flex-col mb-2">
-              <span className="text-lg font-bold mb-2">Progress</span>
-              <Slider
-                step={0.01}
-                max={clip[1] ?? duration ?? 0}
-                min={clip[0] ?? 0}
-                value={progress}
-                onChange={(e) => {
-                  updateProgress(e);
-                }}
-              />
-              <div className="flex">
-                <button
-                  className="rounded bg-blue-200 p-2 mr-2"
-                  onClick={() => {
-                    setClip([progress, clip[1]]);
-                  }}
-                >
-                  Set Start
-                </button>
-                <button
-                  className="rounded bg-blue-200 p-2"
-                  onClick={() => {
-                    setClip([clip[0], progress]);
-                  }}
-                >
-                  Set End
-                </button>
-              </div>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-lg font-bold mb-2">Volume</span>
-              <input
-                type="range"
-                max="100"
-                min="0"
-                value={volume}
-                onChange={(e) => setVolume(Number(e.target.value))}
-                className="p-2"
-              />
-            </div>
-          </div>
-          <div>
-            <div className="flex flex-col">
-              <span className="text-lg font-bold mb-2">Fps</span>
-              <div>
-                <Slider
-                  step={0.01}
-                  max={fps}
-                  min={0}
-                  value={resFps}
-                  onChange={(e) => {
-                    setResFps(e);
-                  }}
-                />
-                <button
-                  className="rounded bg-blue-400 mr-2 p-2"
-                  onClick={() => setResFps(10)}
-                >
-                  10fps
-                </button>
-                <button
-                  className="rounded bg-blue-400 mr-2 p-2"
-                  onClick={() => setResFps(15)}
-                >
-                  15fps
-                </button>
-                <button
-                  className="rounded bg-blue-400 mr-2 p-2"
-                  onClick={() => setResFps(21)}
-                >
-                  21fps
-                </button>
-              </div>
-              <span className="text-lg font-bold mb-2">Scale</span>
-              <div>
-                <Slider
-                  step={0.01}
-                  max={1}
-                  min={0}
-                  value={resScale}
-                  onChange={(e) => {
-                    setResScale(e);
-                  }}
-                />
-                <button
-                  className="rounded bg-blue-400 p-2  mr-2"
-                  onClick={() => setResScale(1)}
-                >
-                  100%
-                </button>
-                <button
-                  className="rounded bg-blue-400 p-2  mr-2"
-                  onClick={() => setResScale(0.75)}
-                >
-                  75%
-                </button>
-                <button
-                  className="rounded bg-blue-400 p-2  mr-2"
-                  onClick={() => setResScale(0.5)}
-                >
-                  50%
-                </button>
-                <button
-                  className="rounded bg-blue-400 p-2  mr-2"
-                  onClick={() => setResScale(0.25)}
-                >
-                  25%
-                </button>
-                <span>
-                  {dimension.width * resScale} x {dimension.height * resScale}
-                </span>
-              </div>
-            </div>
-            <div>
-              <h3 className="text-lg font-bold mb-2">Crop</h3>
-              <div className="flex-row">
-                <button
-                  className="rounded bg-blue-400 p-2 mr-2"
-                  onClick={() => setCropping((c) => !c)}
-                >
-                  {isCropping ? "No Crop" : "Crop"}
-                </button>
-                <button
-                  className="rounded bg-blue-400 p-2 mr-2"
-                  onClick={() => cropperRef.current.resetCrop()}
-                >
-                  Reset Crop
-                </button>
-              </div>
-            </div>
-            <div>
-              <h3 className="text-lg font-bold mb-2">Output Format</h3>
-              <select
-                value={outType}
-                onChange={(e) =>
-                  setOutType(e.target.value as keyof typeof MEDIA_TYPES)
-                }
-              >
-                {Object.keys(MEDIA_TYPES).map((e) => (
-                  <option key={e} value={e}>
-                    {e.toUpperCase()}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <h3 className="text-lg font-bold mb-2">Convert</h3>
-              <button
-                className={`rounded p-2 ${
-                  !isFFMpegLoading ? "bg-blue-400" : "bg-gray-500"
-                }`}
+            </Section>
+            <Section sub>
+              <Typography weight="font-bold" size="text-lg" type="h3">
+                Convert
+              </Typography>
+              <Button
+                color={!isFFMpegLoading ? "bg-blue-400" : "bg-gray-500"}
                 onClick={convert}
                 disabled={isFFMpegLoading}
               >
-                Convert !
-              </button>
-              <a
-                className={`rounded p-2 mx-2 ${
-                  res?.src ? "bg-blue-600" : "bg-gray-500"
-                }`}
-                href={res?.src}
-                target="__blank"
-                download={res?.name}
+                Convert
+              </Button>
+              <Button
+                color={res?.src ? "bg-blue-600" : "bg-gray-500"}
+                onClick={download}
+                disabled={!res?.src}
               >
-                Download !
-              </a>
-              {Math.round((res?.size ?? 0) / 10000) / 100} MB
-            </div>
-          </div>
-        </div>
-        <div className="p-2">
-          {convertProgress &&
-            `${convertProgress.message} ${
-              (convertProgress.ratio ?? 0) > 0
-                ? convertProgress.ratio + "%"
-                : ""
-            }`}
-        </div>
-        <div className="p-2">
-          {res?.type === "image" ? (
-            <img alt={res?.name} src={res?.src} />
-          ) : res?.type === "audio" ? (
-            <audio controls>
-              <source src={res?.src}></source>
-            </audio>
-          ) : (
-            <video src={res?.src} controls></video>
-          )}
+                Download
+              </Button>
+              <Typography>
+                {roundToNDecimalPlaces((res?.size ?? 0) / 1000000, 2)} MB (
+                {dimension.width * resScale}x{dimension.height * resScale} px ,{" "}
+                {fps} fps)
+              </Typography>
+            </Section>
+          </Section>
         </div>
       </div>
     </div>

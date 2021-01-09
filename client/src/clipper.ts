@@ -157,12 +157,15 @@ export const clipStream = async (
 
       switch (type) {
         case "mp4":
+          args.push("-c:v", "libx264");
           // args.push("-movflags", "frag_keyframe+empty_moov");
           break;
         case "gif":
           verbose(`Saving temp file for ${title}`);
 
           const gifName = `tmp/gif-${filenameInternal}_${quality}_${start}_${end}_${scale}_${fps}_${x}_${y}_${width}_${height}.mp4`;
+
+          args.push("-c:v", "libx264");
 
           args.push(gifName);
 

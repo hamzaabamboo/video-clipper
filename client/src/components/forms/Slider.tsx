@@ -1,4 +1,5 @@
 import React from "react";
+import { NumberField } from "./NumberField";
 
 interface SliderProps {
   value?: number;
@@ -17,21 +18,21 @@ export const Slider: React.FC<SliderProps> = ({
 }) => {
   return (
     <div className="flex mb-2">
-      <input
-        type="number"
-        step={step}
-        max={max}
-        min={min}
-        className="p-2 mr-2 rounded border border-black flex-shrink"
-        value={value}
-        onChange={(e) => {
-          onChange(Number(e.target.value));
-        }}
-      />
+      <div className="flex-shrink pr-2">
+        <NumberField
+          step={step}
+          max={max}
+          min={min}
+          value={value}
+          onChange={(e) => {
+            onChange(Number(e.target.value));
+          }}
+        />
+      </div>
       <input
         type="range"
         step=".01"
-        className="w-100 flex-grow p-2"
+        className="w-full flex-grow p-2"
         max={max}
         min={min}
         value={value}

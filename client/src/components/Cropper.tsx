@@ -177,7 +177,7 @@ export const Cropper = forwardRef<
   };
 
   return (
-    <div ref={parentRef} className="relative w-3/5 ">
+    <div ref={parentRef} className="relative">
       <div
         className="absolute z-20"
         ref={cropperRef}
