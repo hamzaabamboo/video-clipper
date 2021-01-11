@@ -18,6 +18,7 @@ import { sleep } from "./utils/sleep";
 import { roundToNDecimalPlaces } from "./utils/roundToNDecimal";
 import { Typography } from "./components/Typography";
 import { NumberField } from "./components/forms/NumberField";
+import { resolve } from "path";
 
 const DEFAULT_WIDTH = 720;
 type SourceType = "youtube" | "upload";
@@ -214,7 +215,7 @@ const App = () => {
   const convert = async () => {
     if (!video) return;
     try {
-      let buffer: Uint8Array;
+      let file: File;
       switch (video.type) {
         case "upload":
           setConvertProgress({
@@ -222,7 +223,33 @@ const App = () => {
           });
           const videoFile = fileInputRef?.current?.files?.[0];
           if (!videoFile) return;
-          buffer = new Uint8Array((await videoFile.arrayBuffer()) ?? []);
+          const CHUNK_SIZE = 10 ** 9;
+          const chunks = Math.ceil(videoFile.size / CHUNK_SIZE);
+          // const res = await Promise.all(
+          //   Array(chunks)
+          //     .fill(null)
+          //     .map(async (_, i) => {
+          //       console.log(
+          //         "loading chunk ",
+          //         i,
+          //         i * CHUNK_SIZE,
+          //         (i + 1) * CHUNK_SIZE - 1
+          //       );
+          //       return await videoFile
+          //         .slice(
+          //           i * CHUNK_SIZE,
+          //           i === chunks - 1 ? videoFile.size : (i + 1) * CHUNK_SIZE - 1
+          //         )
+          //         .arrayBuffer();
+          //     })
+          // );
+          // buffer = res.reduce<Uint8Array>((p, c) => {
+          //   const tmp = new Uint8Array(p.byteLength + c.byteLength);
+          //   tmp.set(p, 0);
+          //   tmp.set(new Uint8Array(c), p.byteLength);
+          //   return tmp;
+          // }, new Uint8Array([]));
+          file = videoFile;
           setConvertProgress({
             message: "Loading Video...",
           });
@@ -231,14 +258,18 @@ const App = () => {
           setConvertProgress({
             message: "Downloading Video...",
           });
-          buffer = await downloadVideo(url, video?.title ?? "", video.quality);
+          file = new File(
+            [await downloadVideo(url, video?.title ?? "", video.quality)],
+            video.title
+          );
           setConvertProgress({
             message: "Video Downloaded",
           });
           break;
       }
+
       const r = await clipStream(
-        buffer,
+        file,
         video?.title,
         clip[0],
         clip[1],
@@ -264,6 +295,7 @@ const App = () => {
         size: r.file.size,
       });
     } catch (e) {
+      console.log(e);
       setConvertProgress({
         message: "Something Went Wrong... " + e,
       });

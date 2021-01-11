@@ -1,4 +1,5 @@
 import { createFFmpeg, fetchFile } from "@ffmpeg/ffmpeg";
+import { processMp4 } from "./lib/mp4trim";
 
 export const ffmpeg = createFFmpeg({
   log: true,
@@ -80,7 +81,7 @@ export const downloadVideo = async (
 };
 
 export const clipStream = async (
-  buffer: Uint8Array,
+  file: File,
   title: string,
   start?: number,
   end?: number,
@@ -109,16 +110,20 @@ export const clipStream = async (
     const { extension, mimetype, type: outType } = MEDIA_TYPES[type];
 
     const filenameInternal = `${encodeURIComponent(title)}`;
-    const tmpname = `tmp/tmp-${filenameInternal}_${quality}.mp4`;
+    const tmpname = `tmp-${filenameInternal}_${quality}.mp4`;
     const outname = `out-${filenameInternal}_${quality}_${start}_${end}_${scale}_${fps}_${x}_${y}_${width}_${height}.${extension}`;
 
     try {
-      ffmpeg.FS("stat", `${tmpname}`);
+      if (type !== "gif") {
+        ffmpeg.FS("stat", `tmp/${tmpname}`);
+      }
+      console.log(ffmpeg.FS("mkdir", "test"));
+      console.log(ffmpeg.FS("stat", "test/"));
     } catch (e) {
-      ffmpeg.FS("writeFile", `${tmpname}`, buffer);
+      // ffmpeg.FS("writeFile", `tmp/${tmpname}`, file);
     }
 
-    let file: Uint8Array;
+    // let file: Uint8Array;
     try {
       onProgress({
         message: "Loading Video...",
@@ -132,7 +137,7 @@ export const clipStream = async (
       if (Number(start ?? 0) > 0)
         args.push("-ss", Number(start ?? 0).toString());
 
-      args.push("-i", `${tmpname}`);
+      args.push("-i", `test/abc.mkv`);
 
       args.push("-t", dur.toString());
 
@@ -169,14 +174,17 @@ export const clipStream = async (
 
           args.push(gifName);
 
-          ffmpeg.setProgress(({ ratio }) => {
-            onProgress({
-              message: `Saving Temporary Video File`,
-              ratio: Math.round(ratio * 100),
-            });
-          });
-          await ffmpeg.run(...args);
-          ffmpeg.setProgress(() => {});
+          console.log(file.name);
+          await processMp4(args, [file]);
+
+          // ffmpeg.setProgress(({ ratio }) => {
+          //   onProgress({
+          //     message: `Saving Temporary Video File`,
+          //     ratio: Math.round(ratio * 100),
+          //   });
+          // });
+          // await ffmpeg.run(...args);
+          // ffmpeg.setProgress(() => {});
           verbose(`Creating GIF for ${title}`);
           args.splice(0, args.length);
           args.push(
@@ -207,13 +215,16 @@ export const clipStream = async (
         message: "Done !",
       });
     }
-
-    file = ffmpeg.FS("readFile", outname) as Uint8Array;
+    const fileRes = ffmpeg.FS("readFile", outname) as Uint8Array;
 
     return {
-      file: new File([file], `${filename ?? filenameInternal}.${extension}`, {
-        type: mimetype,
-      }),
+      file: new File(
+        [fileRes],
+        `${filename ?? filenameInternal}.${extension}`,
+        {
+          type: mimetype,
+        }
+      ),
       type: outType,
       name: `${filename ?? filenameInternal}.${extension}`,
     };

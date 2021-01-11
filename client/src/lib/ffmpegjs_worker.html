@@ -1,0 +1,92 @@
+<!-- YOU WILL HAVE TO HAVE ffmpeg-worker-mp4.js -->
+
+<!DOCTYPE html>
+<html>
+  <body>
+    <input id="myFiles" type="file" />
+  </body>
+  <script>
+    function downloadData(blob, basename) {
+      basename = basename || "output";
+      let url = URL.createObjectURL(blob);
+      let a = document.createElement("a");
+      document.body.appendChild(a);
+      a.style.display = "none";
+      a.href = url;
+      a.download = `${basename}.${blob.type.split("/")[1]}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    }
+
+    const init = async () => {
+      let worker = new Worker("./ffmpeg-worker-mp4.js");
+
+      worker.addEventListener("message", function (msg) {
+        switch (msg.data.type) {
+          case "stdout":
+            console.log(msg.data);
+            break;
+          case "stderr":
+            console.log(msg.data);
+            break;
+          case "ready":
+            break;
+          case "done":
+            worker.terminate();
+            console.log(msg.data);
+            downloadData(
+              new Blob([msg.data.data.MEMFS[0].data], {
+                type: "video/mp4",
+              }),
+              "test"
+            );
+            break;
+        }
+      });
+
+      let offset = 0;
+      let len = 0;
+
+      const inputElement = document.getElementById("myFiles");
+      inputElement.addEventListener("change", handleFiles, false);
+      function handleFiles() {
+        const fileList = this.files; /* now you can work with the file list */
+        console.log(fileList);
+
+        worker.postMessage({
+          type: "run",
+          arguments: [
+            "-ss",
+            "800",
+            "-i",
+            `/data/${fileList[0].name}`,
+            "-ss",
+            "1",
+            "-vcodec",
+            "copy",
+            "-acodec",
+            "copy",
+            "-t",
+            "20",
+            "-avoid_negative_ts",
+            "1",
+            "out.mp4",
+          ],
+          mounts: [
+            {
+              type: "WORKERFS",
+              opts: {
+                files: fileList,
+              },
+              mountpoint: "/data",
+            },
+          ],
+          // WORKERFS: [{ name: fileList[0].name,  data: fileList[0] }],
+        });
+      }
+    };
+
+    init();
+  </script>
+</html>
