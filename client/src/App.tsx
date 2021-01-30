@@ -5,7 +5,8 @@ import qs from "querystring";
 import { Range } from "rc-slider";
 import "rc-slider/assets/index.css";
 
-import { clipStream, downloadVideo, ffmpeg, MEDIA_TYPES } from "./clipper";
+import { clipStream, ffmpeg } from "./lib/clipper";
+import { downloadVideo } from "./lib/downloadVideo";
 import { Button } from "./components/Button";
 import { Coordinate, Cropper, Dimension } from "./components/Cropper";
 import { Select } from "./components/forms/Select";
@@ -18,6 +19,7 @@ import { sleep } from "./utils/sleep";
 import { roundToNDecimalPlaces } from "./utils/roundToNDecimal";
 import { Typography } from "./components/Typography";
 import { NumberField } from "./components/forms/NumberField";
+import { MEDIA_TYPES } from "./constants/mediaTypes";
 
 const DEFAULT_WIDTH = 720;
 type SourceType = "youtube" | "upload";
@@ -154,12 +156,15 @@ const App = () => {
       done = true;
     };
   }, []);
+
+  //Volume Controls
   useEffect(() => {
     localStorage.setItem("volume", String(volume));
     if (!videoRef.current) return;
     videoRef.current.volume = volume / 100;
   }, [volume]);
 
+  //Video Controls
   useEffect(() => {
     if (clip[1] && !seekingRef.current && progress >= clip[1]) {
       if (!loop) updateProgress(clip[0]);
@@ -170,6 +175,7 @@ const App = () => {
     }
   }, [progress, clip, loop]);
 
+  //Bind Key to video player
   useEffect(() => {
     const toggle = (e: KeyboardEvent) => {
       if (e.key === " " && (e.target as HTMLElement).tagName !== "INPUT") {
@@ -186,8 +192,10 @@ const App = () => {
     };
   }, [video]);
 
+  //Change Video
   useEffect(() => {
     const info = videoRes.find((e) => e.itag === videoQuality);
+    console.log(info);
     if (!videoQuality || !info) return;
     setVideoSrc({
       url: info.url,
@@ -234,7 +242,12 @@ const App = () => {
           setConvertProgress({
             message: "Downloading Video...",
           });
-          buffer = await downloadVideo(url, video?.title ?? "", video.quality);
+          buffer = await downloadVideo(
+            url,
+            video?.title ?? "",
+            video.quality,
+            setConvertProgress
+          );
           setConvertProgress({
             message: "Video Downloaded",
           });
