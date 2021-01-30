@@ -5,10 +5,11 @@ export const Typography: React.FC<TypographyProps> = ({
   children,
   weight,
   align,
+  margin,
 }) => {
   const classes = `${size ?? "text-md"} ${color ?? "text-black"} ${
     weight ?? "font-normal"
-  } mb-2 ${align ?? "align-start"}`;
+  } ${margin ?? "mb-2"} ${align ?? "align-start"}`;
   switch (type) {
     case "h1":
       return <h1 className={classes}>{children}</h1>;
@@ -31,4 +32,5 @@ interface TypographyProps {
   weight?: string;
   size?: string;
   align?: string;
+  margin?: string;
 }

@@ -75,8 +75,11 @@ const App = () => {
   const [resScale, setResScale] = useState<number>(1);
   const [resFps, setResFps] = useState<number>(30);
 
+  const [speed, setSpeed] = useState<number>(1);
+
   const [isPlaying, _setPlaying] = useState<boolean>(false);
   const [isCropping, setCropping] = useState<boolean>(false);
+  const [isBoomerang, setBoomerang] = useState<boolean>(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const cropperRef = useRef<any>(null);
@@ -251,6 +254,8 @@ const App = () => {
         cropPosition.y,
         cropDimension.width,
         cropDimension.height,
+        speed,
+        isBoomerang,
         (progress) => setConvertProgress(progress)
       );
 
@@ -305,7 +310,7 @@ const App = () => {
     <div className="flex justify-start flex-col items-center min-h-screen w-screen py-2">
       <div>
         <Typography size="text-3xl" weight="font-bold" align="text-center">
-          Video Clipping Tool V1.8!
+          Video Clipping Tool V1.9!
         </Typography>
       </div>
       <div className="flex flex-col lg:flex-row py-2 px-4 w-full lg:h-full">
@@ -644,6 +649,23 @@ const App = () => {
                     </Typography>
                   )}
                 </div>
+                <Typography weight="font-bold" size="text-lg" type="h3">
+                  Speed
+                </Typography>
+                <div>
+                  <Slider
+                    step={0.01}
+                    max={3}
+                    min={0.1}
+                    value={roundToNDecimalPlaces(speed, 2)}
+                    onChange={(e) => {
+                      setSpeed(e);
+                    }}
+                  />
+                  <Button onClick={() => setSpeed(1)}>1x</Button>
+                  <Button onClick={() => setSpeed(0.5)}>0.5x</Button>
+                  <Button onClick={() => setSpeed(2)}>2x</Button>
+                </div>
               </div>
               <div>
                 <Typography weight="font-bold" size="text-lg" type="h3">
@@ -663,6 +685,22 @@ const App = () => {
                     Reset Crop
                   </Button>
                 </div>
+              </div>
+            </Section>
+            <Section sub>
+              <Typography weight="font-bold" size="text-lg" type="h3">
+                Others
+              </Typography>
+              <div className="flex items-center">
+                <Typography size="text-md" margin="mr-2">
+                  Boomerang mode
+                </Typography>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={isBoomerang}
+                  onChange={(e) => setBoomerang(e.target.checked)}
+                />
               </div>
             </Section>
             <Section sub>

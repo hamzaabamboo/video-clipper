@@ -93,6 +93,8 @@ export const clipStream = async (
   y = 0,
   width = 1,
   height = 1,
+  speed = 1,
+  boomerang = false,
   onProgress: (proress: { message: string; ratio?: number }) => void = () => {}
 ): Promise<{ file: Blob; type: string; name: string }> => {
   const dur = Number(end) - Number(start);
@@ -110,7 +112,7 @@ export const clipStream = async (
 
     const filenameInternal = `${encodeURIComponent(title)}`;
     const tmpname = `tmp/tmp-${filenameInternal}_${quality}.mp4`;
-    const outname = `out-${filenameInternal}_${quality}_${start}_${end}_${scale}_${fps}_${x}_${y}_${width}_${height}.${extension}`;
+    const outname = `out-${filenameInternal}_${quality}_${start}_${end}_${scale}_${fps}_${x}_${y}_${width}_${height}_${speed}_${boomerang}.${extension}`;
 
     try {
       ffmpeg.FS("stat", `${tmpname}`);
@@ -129,15 +131,21 @@ export const clipStream = async (
       });
     } catch {
       const args: string[] = [];
-      if (Number(start ?? 0) > 0)
+      if (Number(start ?? 0) > 0) {
         args.push("-ss", Number(start ?? 0).toString());
+
+        args.push("-to", (Number(start) + dur).toString());
+      } else {
+        args.push("-to", dur.toString());
+      }
 
       args.push("-i", `${tmpname}`);
 
-      args.push("-t", dur.toString());
+      args.push("-i", `${tmpname}`);
 
       if (type !== "mp3") {
         const filters: string[] = [];
+
         if (
           Number(x) >= 0 &&
           Number(y) >= 0 &&
@@ -151,8 +159,24 @@ export const clipStream = async (
           );
         }
 
+        if (speed > 0) {
+          filters.push(`setpts=${1 / speed}*PTS`);
+        }
+
         filters.push(`scale=${scale}*in_w:-2`);
-        args.push("-vf", filters.join(","));
+
+        if (boomerang) {
+          args.push(
+            "-filter_complex",
+            `[0:v]${filters.join(
+              ","
+            )},split=2[begin][mid];[mid]reverse[r];[begin][r]concat=n=2:v=1:a=0[v]`,
+            "-map",
+            "[v]"
+          );
+        } else {
+          args.push("-vf", filters.join(","));
+        }
       }
 
       switch (type) {
@@ -163,7 +187,7 @@ export const clipStream = async (
         case "gif":
           verbose(`Saving temp file for ${title}`);
 
-          const gifName = `tmp/gif-${filenameInternal}_${quality}_${start}_${end}_${scale}_${fps}_${x}_${y}_${width}_${height}.mp4`;
+          const gifName = `tmp/gif-${filenameInternal}_${quality}_${start}_${end}_${scale}_${fps}_${x}_${y}_${width}_${height}_${speed}_${boomerang}.mp4`;
 
           args.push("-c:v", "libx264");
 
