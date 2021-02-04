@@ -9,6 +9,12 @@ import { ClipperModule } from './clipper/clipper.module';
   imports: [
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'client'),
+      serveStaticOptions: {
+        setHeaders: (res, path) => {  // this covers  1. and 2. situation but NOT the 3. one
+          res.setHeader('Cross-Origin-Opener-Policy','same-origin');
+          res.setHeader("Cross-Origin-Embedder-Policy",'require-corp')
+        }
+    }
     }),
     ClipperModule,
   ],
