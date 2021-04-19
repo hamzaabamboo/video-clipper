@@ -34,4 +34,14 @@ export const MEDIA_TYPES = {
     extension: "gif",
     mimetype: "image/gif",
   },
+  png: {
+    type: "image",
+    extension: "png",
+    mimetype: "image/png",
+  },
+  jpg: {
+    type: "image",
+    extension: "jpg",
+    mimetype: "image/jpg",
+  },
 };

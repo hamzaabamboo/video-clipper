@@ -44,7 +44,10 @@ export const clipStream = async (
 
     const filenameInternal = `${encodeURIComponent(title)}`;
     const tmpname = `tmp/tmp-${filenameInternal}_${quality}.mp4`;
-    const outname = `out-${filenameInternal}_${quality}_${start}_${end}_${scale}_${fps}_${x}_${y}_${width}_${height}_${speed}_${boomerang}.${extension}`;
+    const outname =
+      type !== "gif" && outType === "image"
+        ? `out_${quality}_${start}_${x}_${y}_${width}_${height}.${extension}`
+        : `out-${filenameInternal}_${quality}_${start}_${end}_${scale}_${fps}_${x}_${y}_${width}_${height}_${speed}_${boomerang}.${extension}`;
 
     try {
       ffmpeg.FS("stat", `${tmpname}`);
@@ -63,15 +66,15 @@ export const clipStream = async (
       });
     } catch {
       const args: string[] = [];
-      if (Number(start ?? 0) > 0) {
+      if (Number(start ?? 0) >= 0) {
         args.push("-ss", Number(start ?? 0).toString());
 
-        args.push("-to", (Number(start) + dur).toString());
+        if (!(outType === "image" && type !== "gif"))
+          args.push("-to", (Number(start) + dur).toString());
       } else {
-        args.push("-to", dur.toString());
+        if (!(outType === "image" && type !== "gif"))
+          args.push("-to", dur.toString());
       }
-
-      args.push("-i", `${tmpname}`);
 
       args.push("-i", `${tmpname}`);
 
@@ -112,6 +115,14 @@ export const clipStream = async (
       }
 
       switch (type) {
+        case "png":
+          args.push("-vframes", "1");
+          // args.push("-movflags", "frag_keyframe+empty_moov");
+          break;
+        case "jpg":
+          args.push("-vframes", "1");
+          // args.push("-movflags", "frag_keyframe+empty_moov");
+          break;
         case "mp4":
           args.push("-c:v", "libx264");
           // args.push("-movflags", "frag_keyframe+empty_moov");
@@ -152,6 +163,7 @@ export const clipStream = async (
           ratio: Math.round(ratio * 100),
         });
       });
+
       await ffmpeg.run(...args);
       ffmpeg.setProgress(() => {});
 
