@@ -17,7 +17,7 @@ export const downloadVideo = async (
 
   verbose("[clipper] downloaded info");
   try {
-    console.log(ffmpeg.FS("stat", tmpname));
+    console.log(ffmpeg.FS("stat" as any, tmpname));
     verbose("[clipper] using preloaded video");
   } catch (e) {
     const {
