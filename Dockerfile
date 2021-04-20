@@ -1,20 +1,10 @@
-FROM node:alpine as builder
-WORKDIR /app
-COPY ./client/package.json ./client/yarn.lock ./client/
-COPY ./server ./server/
-RUN cd ./client && npm install
-COPY ./client/ ./client/
-RUN cd ./client && npm run build
-
-FROM node As server
+FROM node:alpine
 
 WORKDIR /app
+
+RUN apk update && apk --no-cache add --virtual native-deps g++ gcc libgcc libstdc++ linux-headers make python libpcap-dev
 
 RUN npm install -g @nestjs/cli
-
-RUN apt update 
-
-RUN apt install libpcap-dev -y
 
 COPY ./server/package.json ./server/yarn.lock ./
 
@@ -24,7 +14,7 @@ COPY ./server .
 
 RUN npm run build
 
-COPY --from=builder /app/client/build /app/client
+COPY ./client-build ./client
 
 ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}

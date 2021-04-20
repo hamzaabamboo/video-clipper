@@ -65,6 +65,22 @@ jobs:
           context: .
           push: true
           tags: hamzaabamboo/video-clipper:latest
-          file: Dockerfile.actions
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
+  deploy_heroku:
+    name: Build and Deploy Heroku
+    needs: build-client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Download a single artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: client
+          path: client-build
+      - uses: akhileshns/heroku-deploy@v3.5.7 # This is the action
+        with:
+          heroku_api_key: ${{secrets.HEROKU_API_KEY}}
+          heroku_app_name: ${{secrets.HEROKU_APP_NAME}} #Must be unique in Heroku
+          heroku_email: ${{secrets.HEROKU_EMAIL}}
+          usedocker: true
