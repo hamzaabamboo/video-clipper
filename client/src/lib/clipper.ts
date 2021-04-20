@@ -50,7 +50,7 @@ export const clipStream = async (
         : `out-${filenameInternal}_${quality}_${start}_${end}_${scale}_${fps}_${x}_${y}_${width}_${height}_${speed}_${boomerang}.${extension}`;
 
     try {
-      ffmpeg.FS("stat", `${tmpname}`);
+      ffmpeg.FS("stat" as any, `${tmpname}`);
     } catch (e) {
       ffmpeg.FS("writeFile", `${tmpname}`, buffer);
     }
