@@ -1,27 +1,30 @@
 FROM node:alpine as builder
 WORKDIR /app
-COPY ./client/package.json ./client/yarn.lock ./
-RUN yarn
-COPY ./client .
-RUN yarn build
+COPY ./client/package.json ./client/yarn.lock ./client/
+COPY ./server ./server/
+RUN cd ./client && npm install
+COPY ./client/ ./client/
+RUN cd ./client && npm run build
 
-FROM node:alpine As server
+FROM node As server
 
 WORKDIR /app
 
-RUN yarn global add @nestjs/cli
+RUN npm install -g @nestjs/cli
 
-RUN apk add  --no-cache ffmpeg
+RUN apt update 
+
+RUN apt install libpcap-dev -y
 
 COPY ./server/package.json ./server/yarn.lock ./
 
-RUN yarn
+RUN npm install
 
 COPY ./server .
 
-RUN yarn build
+RUN npm run build
 
-COPY --from=builder /app/build /app/client
+COPY --from=builder /app/client/build /app/client
 
 ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}
