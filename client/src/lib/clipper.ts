@@ -60,7 +60,6 @@ export const clipStream = async (
       onProgress({
         message: "Loading Video...",
       });
-      ffmpeg.FS("stat", outname);
       onProgress({
         message: "Done...",
       });
