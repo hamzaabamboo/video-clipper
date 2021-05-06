@@ -17,21 +17,24 @@ const getSize: NextApiHandler = async (req, res) => {
       },
     });
     const stream = ytdl.downloadFromInfo(info, { quality: quality });
-    stream.on("info", (_, format) => {
-      var parsed = new URL(format.url);
-      https
-        .request(
-          parsed,
-          {
-            method: "HEAD",
-          },
-          (_res) => {
-            res.send({ size: _res.headers["content-length"] });
-          }
-        )
-        .end();
-      stream.destroy();
+    const size = await new Promise((resolve) => {
+      stream.on("info", (_, format) => {
+        var parsed = new URL(format.url);
+        https
+          .request(
+            parsed,
+            {
+              method: "HEAD",
+            },
+            (_res) => {
+              resolve(_res.headers["content-length"]);
+            }
+          )
+          .end();
+        stream.destroy();
+      });
     });
+    res.send({ size });
   } catch (error) {
     res.status(400).send("Oops");
   }

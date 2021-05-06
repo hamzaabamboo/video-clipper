@@ -191,7 +191,6 @@ const App = () => {
   //Change Video
   useEffect(() => {
     const info = videoRes.find((e) => e.itag === videoQuality);
-    console.log(info);
     if (!videoQuality || !info) return;
     setVideoSrc({
       url: info.url,
@@ -204,7 +203,6 @@ const App = () => {
 
   const getVidData = async () => {
     try {
-      localStorage.setItem("videoUrl", url);
       const {
         data: { title, allFormats },
       } = await axios.get("api/vid?" + qs.encode({ url }));
@@ -212,7 +210,7 @@ const App = () => {
       setVideoRes(
         allFormats.filter((e) => e.container === "mp4" && e.hasVideo)
       );
-      setVideoQuality(22);
+      setVideoQuality(allFormats.some((e) => e.itag === 22) ? 22 : 18);
     } catch {
       setVideoSrc(undefined);
     }
