@@ -5,42 +5,11 @@ on:
     branches: main
 
 jobs:
-  build-client:
-    name: Build Client
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Install and Build 🔧
-        uses: actions/setup-node@v1
-        with:
-          node-version: "12"
-      - name: Install Dependencies
-        run: npm install
-        working-directory: ./client
-      - name: Build
-        run: npm run build
-        working-directory: ./client
-        env:
-          CI: false
-      - name: Archive production artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: client
-          path: |
-            ./client/build
   build-and-deploy:
     name: Build and Deploy Docker
     needs: build-client
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Download a single artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: client
-          path: client-build
       - run: ls -la
       - name: Cache Docker layers
         uses: actions/cache@v2
@@ -83,20 +52,3 @@ jobs:
         run: |
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-  deploy_heroku:
-    name: Build and Deploy Heroku
-    needs: build-client
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Download a single artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: client
-          path: client-build
-      - uses: akhileshns/heroku-deploy@v3.5.7 # This is the action
-        with:
-          heroku_api_key: ${{secrets.HEROKU_API_KEY}}
-          heroku_app_name: ${{secrets.HEROKU_APP_NAME}} #Must be unique in Heroku
-          heroku_email: ${{secrets.HEROKU_EMAIL}}
-          usedocker: true
