@@ -28,10 +28,10 @@ const getSize: NextApiHandler = async (req, res) => {
             },
             (_res) => {
               resolve(_res.headers["content-length"]);
+              stream.destroy();
             }
           )
           .end();
-        stream.destroy();
       });
     });
     res.send({ size });

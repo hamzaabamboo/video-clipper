@@ -250,19 +250,19 @@ const App = () => {
       const r = await clipStream(
         buffer,
         video?.title,
-        clip[0],
-        clip[1],
+        { start: clip[0], end: clip[1] },
         outType,
         video.quality,
-        outFilename,
-        resFps,
-        resScale,
-        cropPosition.x,
-        cropPosition.y,
-        cropDimension.width,
-        cropDimension.height,
-        speed,
-        isBoomerang,
+        {
+          filename: outFilename,
+          fps: resFps,
+          scale: resScale,
+          crop: { ...cropPosition, ...cropDimension },
+          speed,
+          flags: {
+            boomerang: isBoomerang,
+          },
+        },
         (progress) => setConvertProgress(progress)
       );
 

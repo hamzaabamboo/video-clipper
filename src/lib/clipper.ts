@@ -1,34 +1,46 @@
 import { createFFmpeg } from "@ffmpeg/ffmpeg";
+import { ClippingOptions, Duration } from "src/types/clipping";
 import { MEDIA_TYPES } from "../constants/mediaTypes";
+
 export const ffmpeg = createFFmpeg({
   corePath: "./ffmpeg-core.js",
   log: true,
+  progress: () => {},
 });
 
-export const verbose = (e) => console.log(e);
+export const verbose = (e: string) => console.log(e);
 
-const round = (n) => Math.round(n * 100) / 100;
+const round = (n: number) => Math.round(n * 100) / 100;
 
 export type QualityLabel = number | "local";
 
 export const clipStream = async (
   buffer: Uint8Array,
   title: string,
-  start?: number,
-  end?: number,
-  type: keyof typeof MEDIA_TYPES = "gif",
+  duration: Duration,
+  type: keyof typeof MEDIA_TYPES,
   quality?: number | "local",
-  filename?: string,
-  fps = 30,
-  scale = 1,
-  x = 0,
-  y = 0,
-  width = 1,
-  height = 1,
-  speed = 1,
-  boomerang = false,
+  options: ClippingOptions = {
+    fps: 30,
+    scale: 1,
+    crop: {
+      x: 0,
+      y: 0,
+      width: 1,
+      height: 1,
+    },
+    speed: 1,
+    flags: {
+      boomerang: false,
+    },
+  },
   onProgress: (proress: { message: string; ratio?: number }) => void = () => {}
 ): Promise<{ file: Blob; type: string; name: string }> => {
+  const { fps, scale, crop, speed, flags, filename } = options;
+  const { start, end } = duration;
+  const { x, y, width, height } = crop;
+  const { boomerang } = flags;
+
   const dur = Number(end) - Number(start);
   if (type === "gif" && dur > 60) {
     throw new Error("Duration too long");

@@ -1,5 +1,6 @@
-const ctx: Worker = this as any;
+const ctx: Worker = self as any;
 
-this.
+(ctx as any).importScripts("./ffmpeg-core.js");
 
+ctx.onmessage = ({}) => {};
 export {};
