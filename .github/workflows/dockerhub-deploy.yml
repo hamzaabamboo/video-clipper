@@ -42,6 +42,13 @@ jobs:
           name: client
           path: client-build
       - run: ls -la
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
@@ -58,6 +65,8 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new
       - name: Build and push
         id: docker_build
         uses: docker/build-push-action@v2
@@ -67,6 +76,13 @@ jobs:
           tags: hamzaabamboo/video-clipper:latest
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
+      - # Temp fix
+        # https://github.com/docker/build-push-action/issues/252
+        # https://github.com/moby/buildkit/issues/1896
+        name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
   deploy_heroku:
     name: Build and Deploy Heroku
     needs: build-client
