@@ -19,6 +19,7 @@
     "react-multi-thumb-slider": "^1.0.14",
     "stream-to-blob": "^2.0.1",
     "tailwindcss": "^2.1.2",
+    "ws": "^7.4.5",
     "ytdl-core": "^4.7.0"
   },
   "devDependencies": {

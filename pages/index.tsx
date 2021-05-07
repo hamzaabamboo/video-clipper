@@ -219,15 +219,14 @@ const App = () => {
   const convert = async () => {
     if (!video) return;
     try {
-      let buffer: Uint8Array;
+      let file: File;
       switch (video.type) {
         case "upload":
           setConvertProgress({
             message: "Loading Video...",
           });
-          const videoFile = fileInputRef?.current?.files?.[0];
-          if (!videoFile) return;
-          buffer = new Uint8Array((await videoFile.arrayBuffer()) ?? []);
+          file = fileInputRef?.current?.files?.[0];
+          if (!file) return;
           setConvertProgress({
             message: "Loading Video...",
           });
@@ -236,7 +235,7 @@ const App = () => {
           setConvertProgress({
             message: "Downloading Video...",
           });
-          buffer = await downloadVideo(
+          file = await downloadVideo(
             url,
             video?.title ?? "",
             video.quality,
@@ -247,8 +246,9 @@ const App = () => {
           });
           break;
       }
+
       const r = await clipStream(
-        buffer,
+        file,
         video?.title,
         { start: clip[0], end: clip[1] },
         outType,
@@ -317,7 +317,7 @@ const App = () => {
     <div className="flex justify-start flex-col items-center min-h-screen w-screen py-2">
       <div>
         <Typography size="text-3xl" weight="font-bold" align="text-center">
-          Video Clipping Tool V1.9!
+          Video Clipping Tool V2.0!
         </Typography>
       </div>
       <div className="flex flex-col lg:flex-row py-2 px-4 w-full lg:h-full">
@@ -506,7 +506,7 @@ const App = () => {
                     updateProgress(e);
                   }}
                 />
-                <div className="flex">
+                <div className="flex items-center">
                   <Button
                     color="bg-blue-200"
                     onClick={() => {
@@ -523,6 +523,7 @@ const App = () => {
                   >
                     Set End
                   </Button>
+                  <p>({roundToNDecimalPlaces(clip[1] - clip[0], 2)} second)</p>
                 </div>
               </div>
               <Typography weight="font-bold" size="text-lg">

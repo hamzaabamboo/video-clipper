@@ -15,7 +15,7 @@ const round = (n: number) => Math.round(n * 100) / 100;
 export type QualityLabel = number | "local";
 
 export const clipStream = async (
-  buffer: Uint8Array,
+  source: File,
   title: string,
   duration: Duration,
   type: keyof typeof MEDIA_TYPES,
@@ -55,145 +55,48 @@ export const clipStream = async (
     const { extension, mimetype, type: outType } = MEDIA_TYPES[type];
 
     const filenameInternal = `${encodeURIComponent(title)}`;
-    const tmpname = `tmp/tmp-${filenameInternal}_${quality}.mp4`;
+    const tmpname = source.name;
     const outname =
       type !== "gif" && outType === "image"
         ? `out_${quality}_${start}_${x}_${y}_${width}_${height}.${extension}`
         : `out-${filenameInternal}_${quality}_${start}_${end}_${scale}_${fps}_${x}_${y}_${width}_${height}_${speed}_${boomerang}.${extension}`;
 
-    try {
-      ffmpeg.FS("stat" as any, `${tmpname}`);
-    } catch (e) {
-      ffmpeg.FS("writeFile", `${tmpname}`, buffer);
-    }
+    const args = getArgs("/input/tmpfile", outname, type, duration, options);
 
-    let file: Uint8Array;
-    try {
-      onProgress({
-        message: "Loading Video...",
+    console.log(args);
+
+    const file: File = await new Promise((resolve, reject) => {
+      const worker = new Worker(
+        //@ts-ignore
+        new URL("../../src/worker/worker.ts", import.meta.url),
+        { type: "module" }
+      );
+
+      worker.postMessage({
+        file: source,
+        args,
+        output: outname,
+        outname: `${filename ?? filenameInternal}.${extension}`,
+        mimetype,
       });
-      ffmpeg.FS("stat" as any, outname);
-      onProgress({
-        message: "Done...",
-      });
-    } catch {
-      const args: string[] = [];
-      if (Number(start ?? 0) >= 0) {
-        args.push("-ss", Number(start ?? 0).toString());
-
-        if (!(outType === "image" && type !== "gif"))
-          args.push("-to", (Number(start) + dur).toString());
-      } else {
-        if (!(outType === "image" && type !== "gif"))
-          args.push("-to", dur.toString());
-      }
-
-      args.push("-i", `${tmpname}`);
-
-      if (type !== "mp3") {
-        const filters: string[] = [];
-
-        if (
-          Number(x) >= 0 &&
-          Number(y) >= 0 &&
-          Number(width) > 0 &&
-          Number(height) > 0
-        ) {
-          filters.push(
-            `crop=${round(width)}*in_w:${round(height)}*in_h:${round(
-              x
-            )}*in_w:${round(y)}*in_h`
-          );
-        }
-
-        if (speed > 0) {
-          filters.push(`setpts=${1 / speed}*PTS`);
-        }
-
-        filters.push(`scale=${scale}*in_w:-2`);
-
-        if (boomerang) {
-          args.push(
-            "-filter_complex",
-            `[0:v]${filters.join(
-              ","
-            )},split=2[begin][mid];[mid]reverse[r];[begin][r]concat=n=2:v=1:a=0[v]`,
-            "-map",
-            "[v]"
-          );
-        } else {
-          args.push("-vf", filters.join(","));
-        }
-      }
-
-      switch (type) {
-        case "png":
-          args.push("-vframes", "1");
-          // args.push("-movflags", "frag_keyframe+empty_moov");
-          break;
-        case "jpg":
-          args.push("-vframes", "1");
-          // args.push("-movflags", "frag_keyframe+empty_moov");
-          break;
-        case "mp4":
-          args.push("-c:v", "libx264");
-          // args.push("-movflags", "frag_keyframe+empty_moov");
-          break;
-        case "gif":
-          verbose(`Saving temp file for ${title}`);
-
-          const gifName = `tmp/gif-${filenameInternal}_${quality}_${start}_${end}_${scale}_${fps}_${x}_${y}_${width}_${height}_${speed}_${boomerang}.mp4`;
-
-          args.push("-c:v", "libx264");
-
-          args.push(gifName);
-
-          ffmpeg.setProgress(({ ratio }) => {
-            onProgress({
-              message: `Saving Temporary Video File`,
-              ratio: Math.round(ratio * 100),
-            });
+      worker.onmessage = ({ data }) => {
+        if ("progress" in data) {
+          console.log(data);
+          onProgress({
+            message: data.progress,
           });
-          await ffmpeg.run(...args);
-          ffmpeg.setProgress(() => {});
-          verbose(`Creating GIF for ${title}`);
-          args.splice(0, args.length);
-          args.push(
-            "-i",
-            gifName,
-            "-vf",
-            `fps=${fps},split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`
-          );
-          break;
-      }
-
-      args.push(outname);
-
-      ffmpeg.setProgress(({ ratio }) => {
+          return;
+        }
+        if ("error" in data) reject(data.error);
         onProgress({
-          message: "Converting...",
-          ratio: Math.round(ratio * 100),
+          message: "Done",
         });
-      });
-
-      await ffmpeg.run(...args);
-      ffmpeg.setProgress(() => {});
-
-      onProgress({
-        message: "Saving Video...",
-      });
-
-      onProgress({
-        message: "Done !",
-      });
-    }
-
-    file = ffmpeg.FS("readFile", outname) as Uint8Array;
+        resolve(data);
+      };
+    });
 
     return {
-      file: new File([file], `${filename ?? filenameInternal}.${extension}`, {
-        type: mimetype,
-      }),
+      file,
       type: outType,
       name: `${filename ?? filenameInternal}.${extension}`,
     };
@@ -201,4 +104,93 @@ export const clipStream = async (
     console.log(error);
     throw new Error("Oops");
   }
+};
+
+const getArgs = (
+  input: string,
+  output: string,
+  type: keyof typeof MEDIA_TYPES,
+  duration: Duration,
+  options: ClippingOptions
+) => {
+  const { fps, scale, crop, speed, flags } = options;
+  const { start, end } = duration;
+  const { x, y, width, height } = crop;
+  const { boomerang } = flags;
+  const { type: outType } = MEDIA_TYPES[type];
+  const args: string[] = [];
+
+  if (Number(start ?? 0) >= 0) {
+    args.push("-ss", Number(start ?? 0).toString());
+
+    if (!(outType === "image" && type !== "gif"))
+      args.push("-to", Number(end).toString());
+  }
+
+  args.push("-i", `${input}`);
+
+  if (type !== "mp3") {
+    const filters: string[] = [];
+    const filterComplex: string[] = [];
+
+    if (
+      Number(x) >= 0 &&
+      Number(y) >= 0 &&
+      Number(width) > 0 &&
+      Number(height) > 0
+    ) {
+      filters.push(
+        `crop=${round(width)}*in_w:${round(height)}*in_h:${round(
+          x
+        )}*in_w:${round(y)}*in_h`
+      );
+    }
+
+    if (speed > 0) {
+      filters.push(`setpts=${1 / speed}*PTS`);
+    }
+
+    if (fps) {
+      filters.push(`fps=${fps}`);
+    }
+    filters.push(`scale=${scale}*in_w:-2`);
+
+    if (boomerang)
+      filterComplex.push(
+        "split=2[begin][mid];[mid]reverse[r];[begin][r]concat=n=2:v=1:a=0"
+      );
+    if (type === "gif")
+      filterComplex.push("split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse");
+
+    if (filterComplex.length > 0) {
+      args.push(
+        "-filter_complex",
+        `[0:v]${filters.join(",")}${
+          (filterComplex && "," + filterComplex.join(",")) || ""
+        }[v]`,
+        "-map",
+        "[v]"
+      );
+    } else {
+      args.push("-vf", filters.join(","));
+    }
+  }
+
+  switch (type) {
+    case "png":
+      args.push("-vframes", "1");
+      break;
+    case "jpg":
+      args.push("-vframes", "1");
+      break;
+    case "mp4":
+      args.push("-c:v", "libx264");
+      break;
+    case "gif":
+      break;
+  }
+
+  args.push(output);
+
+  return args;
 };

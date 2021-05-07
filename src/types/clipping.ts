@@ -1,5 +1,3 @@
-import { MEDIA_TYPES } from "constants/mediaTypes";
-
 export interface CroppingOptions {
   x: number;
   y: number;
