@@ -1,8 +1,10 @@
 # Dead Simple Video Clipper
 
+V2.0 update - much better speed with the help of WORKERFS
+
 Simple video clipper to trim/convert videos to multiple formats
 
-It basically runs ffmpeg commands for you with an interface for you to configure parameters. 
+It basically runs ffmpeg commands for you with an interface for you to configure parameters.
 
 Powered by [ffmpeg-wasm](https://github.com/ffmpegwasm/ffmpeg.wasm), [Nestjs](https://github.com/nestjs/nest), React and TypeScript
 
@@ -13,6 +15,7 @@ Try me now ! : http://video-clipper.herokuapp.com/
 ## Run locally
 
 By using docker image
+
 ```
 docker run -p 3000:3000 hamzaabamboo/video-clipper
 ```
@@ -34,6 +37,7 @@ docker run -p 3000:3000 hamzaabamboo/video-clipper
 
 - Cannot convert long videos duration (Takes too much time)
 - Support up to 2 GB of local files
+
 ## Sample
 
 GIF creation
@@ -51,6 +55,7 @@ Boomerang Mode
 ## Contribute
 
 Feel free to create issue for feature request or pull request for new features
+
 ## TODO
 
 - [ ] server computation

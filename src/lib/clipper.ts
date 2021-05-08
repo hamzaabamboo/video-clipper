@@ -153,14 +153,16 @@ const getArgs = (
     if (fps) {
       filters.push(`fps=${fps}`);
     }
-    filters.push(`scale=${scale}*in_w:-2`);
+    filters.push(`scale=${scale}*in_w:-2:flags=lanczos`);
 
     if (boomerang)
       filterComplex.push(
         "split=2[begin][mid];[mid]reverse[r];[begin][r]concat=n=2:v=1:a=0"
       );
     if (type === "gif")
-      filterComplex.push("split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse");
+      filterComplex.push(
+        "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2:diff_mode=rectangle"
+      );
 
     if (filterComplex.length > 0) {
       args.push(
