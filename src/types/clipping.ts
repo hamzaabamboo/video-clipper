@@ -22,4 +22,5 @@ export interface ClippingOptions {
 
 export interface Flags {
   boomerang?: boolean;
+  fadeout?: boolean;
 }

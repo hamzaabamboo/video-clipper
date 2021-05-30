@@ -1,6 +1,6 @@
 import axios from "axios";
 import { roundToNDecimalPlaces } from "../utils/roundToNDecimal";
-import { QualityLabel, verbose, ffmpeg } from "./clipper";
+import { QualityLabel, verbose } from "./clipper";
 
 const cache: Record<string, File> = {};
 

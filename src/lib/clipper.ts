@@ -1,12 +1,5 @@
-import { createFFmpeg } from "@ffmpeg/ffmpeg";
 import { ClippingOptions, Duration } from "src/types/clipping";
 import { MEDIA_TYPES } from "../constants/mediaTypes";
-
-export const ffmpeg = createFFmpeg({
-  corePath: "./ffmpeg-core.js",
-  log: true,
-  progress: () => {},
-});
 
 export const verbose = (e: string) => console.log(e);
 
@@ -116,7 +109,7 @@ const getArgs = (
   const { fps, scale, crop, speed, flags } = options;
   const { start, end } = duration;
   const { x, y, width, height } = crop;
-  const { boomerang } = flags;
+  const { boomerang, fadeout } = flags;
   const { type: outType } = MEDIA_TYPES[type];
   const args: string[] = [];
 
@@ -159,6 +152,18 @@ const getArgs = (
       filterComplex.push(
         "split=2[begin][mid];[mid]reverse[r];[begin][r]concat=n=2:v=1:a=0"
       );
+    if (fadeout) {
+      const duration = 0.12;
+      const len = boomerang
+        ? 2 * (Number(end) - Number(start))
+        : Number(end) - Number(start);
+      filterComplex.push(
+        `split=2[normal][fade];[normal]trim=start=${duration},setpts=PTS-STARTPTS[start];[fade]trim=duration=${duration},setpts=PTS-STARTPTS
+        [end];[start][end]xfade=transition=fade:duration=${duration}:offset=${
+          len - 2 * duration
+        }`
+      );
+    }
     if (type === "gif")
       filterComplex.push(
         "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2:diff_mode=rectangle"

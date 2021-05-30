@@ -65,116 +65,117 @@ export const Cropper = forwardRef<
     onUpdateCrop(cropPositionRef.current, cropDimensionRef.current);
   };
 
-  const handleDrag = (type: "pos" | "size" | "all") => (
-    event: React.MouseEvent<HTMLDivElement, MouseEvent>
-  ) => {
-    const target = event.nativeEvent.target as HTMLDivElement;
-    let shiftX =
-      event.nativeEvent.clientX - target.getBoundingClientRect().left;
-    let shiftY = event.nativeEvent.clientY - target.getBoundingClientRect().top;
-    event.nativeEvent.stopPropagation();
-    event.nativeEvent.preventDefault();
+  const handleDrag =
+    (type: "pos" | "size" | "all") =>
+    (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+      const target = event.nativeEvent.target as HTMLDivElement;
+      let shiftX =
+        event.nativeEvent.clientX - target.getBoundingClientRect().left;
+      let shiftY =
+        event.nativeEvent.clientY - target.getBoundingClientRect().top;
+      event.nativeEvent.stopPropagation();
+      event.nativeEvent.preventDefault();
 
-    if (!parentRef.current) return;
-    const t = parentRef.current as HTMLDivElement;
+      if (!parentRef.current) return;
+      const t = parentRef.current as HTMLDivElement;
 
-    const rect = t.getBoundingClientRect();
+      const rect = t.getBoundingClientRect();
 
-    function onMouseMove(event: MouseEvent) {
-      if (type === "pos") {
-        const x2 =
-          cropPositionRef.current.x +
-          rect.left * cropDimensionRef.current.width;
-        const y2 =
-          cropPositionRef.current.y +
-          rect.top * cropDimensionRef.current.height;
-        const xOff = event.clientX - shiftX - rect.left;
-        const yOff = event.clientY - shiftY - rect.top;
+      function onMouseMove(event: MouseEvent) {
+        if (type === "pos") {
+          const x2 =
+            cropPositionRef.current.x +
+            rect.left * cropDimensionRef.current.width;
+          const y2 =
+            cropPositionRef.current.y +
+            rect.top * cropDimensionRef.current.height;
+          const xOff = event.clientX - shiftX - rect.left;
+          const yOff = event.clientY - shiftY - rect.top;
 
-        const cropper = cropperRef.current as HTMLDivElement;
+          const cropper = cropperRef.current as HTMLDivElement;
 
-        const xDim = (x2 - xOff) / rect.width;
-        const yDim = (y2 - yOff) / rect.height;
+          const xDim = (x2 - xOff) / rect.width;
+          const yDim = (y2 - yOff) / rect.height;
 
-        if (yOff > 0 && yOff < y2) {
-          cropDimensionRef.current.height = yDim / rect.height;
-          cropper.style.height = yDim * 100 + "%";
-          cropPositionRef.current.y = yOff / rect.height;
-          cropper.style.top = yOff + "px";
+          if (yOff > 0 && yOff < y2) {
+            cropDimensionRef.current.height = yDim / rect.height;
+            cropper.style.height = yDim * 100 + "%";
+            cropPositionRef.current.y = yOff / rect.height;
+            cropper.style.top = yOff + "px";
+          }
+          if (xOff > 0 && xOff < x2) {
+            cropDimensionRef.current.width = xDim / rect.width;
+            cropper.style.width = xDim * 100 + "%";
+            cropPositionRef.current.x = xOff / rect.height;
+            cropper.style.left = xOff + "px";
+          }
         }
-        if (xOff > 0 && xOff < x2) {
-          cropDimensionRef.current.width = xDim / rect.width;
-          cropper.style.width = xDim * 100 + "%";
-          cropPositionRef.current.x = xOff / rect.height;
-          cropper.style.left = xOff + "px";
+        if (type === "all") {
+          const xOff = event.clientX - shiftX - rect.left;
+          const yOff = event.clientY - shiftY - rect.top;
+          const cropper = cropperRef.current as HTMLDivElement;
+          if (
+            yOff > 0 &&
+            yOff + cropDimensionRef.current.height * rect.height < rect.height
+          ) {
+            cropPositionRef.current.y = yOff / rect.height;
+            cropper.style.top = yOff + "px";
+          }
+          if (
+            xOff > 0 &&
+            xOff + cropDimensionRef.current.width * rect.width < rect.width
+          ) {
+            cropPositionRef.current.x = xOff / rect.width;
+            cropper.style.left = xOff + "px";
+          }
+        }
+        if (type === "size") {
+          const xOff =
+            event.clientX -
+            rect.left -
+            cropPositionRef.current.x * rect.width +
+            event.movementX;
+          const yOff =
+            event.clientY -
+            rect.top -
+            cropPositionRef.current.y * rect.height +
+            event.movementY;
+          const cropper = cropperRef.current as HTMLDivElement;
+          const xDim = xOff / rect.width;
+          const yDim = yOff / rect.height;
+          console.log(xDim, yDim);
+          if (yOff > 0 && yOff < rect.height) {
+            cropDimensionRef.current.height = yDim;
+            cropper.style.height = yDim * 100 + "%";
+          }
+          if (xOff > 0 && xOff < rect.width) {
+            cropDimensionRef.current.width = xDim;
+            cropper.style.width = xDim * 100 + "%";
+          }
         }
       }
-      if (type === "all") {
-        const xOff = event.clientX - shiftX - rect.left;
-        const yOff = event.clientY - shiftY - rect.top;
-        const cropper = cropperRef.current as HTMLDivElement;
-        if (
-          yOff > 0 &&
-          yOff + cropDimensionRef.current.height * rect.height < rect.height
-        ) {
-          cropPositionRef.current.y = yOff / rect.height;
-          cropper.style.top = yOff + "px";
-        }
-        if (
-          xOff > 0 &&
-          xOff + cropDimensionRef.current.width * rect.width < rect.width
-        ) {
-          cropPositionRef.current.x = xOff / rect.width;
-          cropper.style.left = xOff + "px";
-        }
-      }
-      if (type === "size") {
-        const xOff =
-          event.clientX -
-          rect.left -
-          cropPositionRef.current.x * rect.width +
-          event.movementX;
-        const yOff =
-          event.clientY -
-          rect.top -
-          cropPositionRef.current.y * rect.height +
-          event.movementY;
-        const cropper = cropperRef.current as HTMLDivElement;
-        const xDim = xOff / rect.width;
-        const yDim = yOff / rect.height;
-        console.log(xDim, yDim);
-        if (yOff > 0 && yOff < rect.height) {
-          cropDimensionRef.current.height = yDim;
-          cropper.style.height = yDim * 100 + "%";
-        }
-        if (xOff > 0 && xOff < rect.width) {
-          cropDimensionRef.current.width = xDim;
-          cropper.style.width = xDim * 100 + "%";
-        }
-      }
-    }
 
-    // move the ball on mousemove
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseenter", onMouseEnter);
+      // move the ball on mousemove
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseenter", onMouseEnter);
 
-    target.onmouseleave = function () {
-      console.log("upp!!!");
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseenter", onMouseEnter);
-      target.onmouseup = null;
-      target.onmouseleave = null;
+      target.onmouseleave = function () {
+        console.log("upp!!!");
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseenter", onMouseEnter);
+        target.onmouseup = null;
+        target.onmouseleave = null;
+      };
+
+      target.onmouseup = function () {
+        console.log("upp!!!");
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseenter", onMouseEnter);
+        target.onmouseup = null;
+        target.onmouseleave = null;
+        updateCrop();
+      };
     };
-
-    target.onmouseup = function () {
-      console.log("upp!!!");
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseenter", onMouseEnter);
-      target.onmouseup = null;
-      target.onmouseleave = null;
-      updateCrop();
-    };
-  };
 
   return (
     <div ref={parentRef} className="relative">
@@ -212,7 +213,9 @@ export const Cropper = forwardRef<
           }}
         ></div>
       </div>
-      <div>{children}</div>
+      <div className="h-full w-full" >
+        {children}
+      </div>
     </div>
   );
 });

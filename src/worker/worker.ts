@@ -1,7 +1,9 @@
 import type createFFmpegCore from "@ffmpeg/core";
+import encode from "@wasm-codecs/gifsicle";
 
 const ctx: Worker = self as any;
 (ctx as any).importScripts("/ffmpeg-core.js");
+// (ctx as any).importScripts("/gifsicle.js");
 
 class FFmpeg {
   ffmpegCore = null;
@@ -28,7 +30,7 @@ class FFmpeg {
   }
 
   log(message) {
-    console.log(message);
+    console.log("ffmpeg:", message);
     this.detectCompletion(message);
   }
 
@@ -144,14 +146,22 @@ class FFmpeg {
   }
 }
 
+const fileExists = (file) => ffmpeg.FS("readdir", "/output/").includes(file);
+const readFile = (file) => ffmpeg.FS("readFile", file);
+
 const ffmpeg = new FFmpeg();
 
-ctx.onmessage = async ({ data: { file, args, output, outname, mimetype } }) => {
+ctx.onmessage = async ({
+  data: { file, args, output, outname, mimetype, isStream },
+}) => {
+  let part = 0;
+
   const onProgress = (msg: string) => {
     ctx.postMessage({
       progress: msg,
     });
   };
+
   try {
     onProgress("Initializing FFmpeg");
     await ffmpeg.load();
@@ -161,9 +171,68 @@ ctx.onmessage = async ({ data: { file, args, output, outname, mimetype } }) => {
       onProgress("Loading Video Data");
       ffmpeg.updateFile(file);
       onProgress("Running FFMpeg");
+      if (isStream) {
+        setInterval(() => {
+          // periodically check for files that have been written
+          if (fileExists(`${part + 1}.mp4`)) {
+            ctx.postMessage({
+              segment: {
+                part,
+                buffer: readFile(`/output/${part}.mp4`),
+              },
+            });
+            part++;
+          }
+        }, 200);
+      }
       await ffmpeg.run(...args);
+      if (isStream) {
+        while (fileExists(`${part}.mp4`)) {
+          ctx.postMessage({
+            segment: {
+              part,
+              buffer: readFile(`/output/${part}.mp4`),
+            },
+          });
+          part++;
+        }
+      }
+
+      const tmp = ffmpeg.FS("readFile", output);
+
+      // await new Promise((resolve) =>
+      //   Gifsicle({
+      //     mainScriptUrlOrBlob: "/gifsicle.js",
+      //     MEMFS: [new File([tmp], outname)],
+      //     printErr: (message) => console.log("fuckerr", message),
+      //     print: (message) => console.log("fuck", message),
+      //     locateFile: (path, prefix) => {
+      //       if (path.endsWith("gifsicle.wasm")) {
+      //         return "/gifsicle.wasm";
+      //       }
+      //       if (path.endsWith("gifsicle.worker.js")) {
+      //         return "/gifsicle.worker.js";
+      //       }
+      //       return prefix + path;
+      //     },
+      //     arguments: ["-O2", output],
+      //     callback: async (f) => {
+      //       console.log("fuck", f);
+      //     },
+      //   })
+      // );
     }
-    const res = ffmpeg.FS("readFile", output);
+    if (isStream) {
+      ctx.postMessage({});
+      return;
+    }
+    const buffer = ffmpeg.FS("readFile", output);
+    let res = buffer;
+    // if (mimetype === "image/gif") {
+    //   res = await encode(buffer, {
+    //     optimizationLevel: 3,
+    //   });
+    // }
     const f = new File([res], outname, { type: mimetype });
     ctx.postMessage(f);
   } catch (e) {

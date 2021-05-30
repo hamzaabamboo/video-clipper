@@ -9,7 +9,9 @@ import { Section } from "components/Section";
 import { Typography } from "components/Typography";
 import { MEDIA_TYPES } from "constants/mediaTypes";
 import { clipStream, ffmpeg } from "lib/clipper";
+import { convertToCorrectFormat } from "lib/convertToCorrectFormat";
 import { downloadVideo } from "lib/downloadVideo";
+import { liveTranscodeTs } from "lib/liveTranscode";
 import qs from "querystring";
 import { Range } from "rc-slider";
 import "rc-slider/assets/index.css";
@@ -26,12 +28,14 @@ const App = () => {
   const [duration, setDuration] = useState<number>(0);
   const [progress, setProgress] = useState<number>(0);
   const [volume, setVolume] = useState<number>(50);
-  const [video, setVideoSrc] = useState<{
-    url: string;
-    title: string;
-    type: SourceType;
-    quality: number | "local";
-  }>();
+  const [video, setVideoSrc] =
+    useState<{
+      url: string;
+      title: string;
+      type: SourceType;
+      mediaSrc?: MediaSource;
+      quality: number | "local";
+    }>();
 
   const [videoTitle, setVideoTitle] = useState<string>();
   const [videoRes, setVideoRes] = useState<any[]>([]);
@@ -40,18 +44,19 @@ const App = () => {
   const [clip, setClip] = useState<[number, number]>([0, 0]);
   const [fps, setFps] = useState<number>(30);
   const [loop, setLoop] = useState<boolean>(true);
-  const [res, setRes] = useState<{
-    src: string;
-    type: string;
-    name: string;
-    size: number;
-  }>();
+  const [res, setRes] =
+    useState<{
+      src: string;
+      type: string;
+      name: string;
+      size: number;
+    }>();
   const [mode, setMode] = useState<SourceType>("youtube");
-  const [isFFMpegLoading, setFFMpegLoading] = useState(false);
-  const [convertProgress, setConvertProgress] = useState<{
-    message: string;
-    ratio?: number;
-  }>();
+  const [convertProgress, setConvertProgress] =
+    useState<{
+      message: string;
+      ratio?: number;
+    }>();
 
   const [dimension, setDimensions] = useState<Dimension>({
     width: 0,
@@ -78,6 +83,7 @@ const App = () => {
   const [isPlaying, _setPlaying] = useState<boolean>(false);
   const [isCropping, setCropping] = useState<boolean>(false);
   const [isBoomerang, setBoomerang] = useState<boolean>(false);
+  const [isFadeout, setFadeout] = useState<boolean>(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const cropperRef = useRef<any>(null);
@@ -114,14 +120,7 @@ const App = () => {
       } else {
       }
     };
-    const initFFmpeg = async () => {
-      setFFMpegLoading(true);
-      if (!ffmpeg?.isLoaded()) await ffmpeg.load();
-      console.log("FFMpeg Ready!");
-      setFFMpegLoading(false);
-    };
     ping();
-    initFFmpeg();
     if (!videoRef.current) return;
     videoRef.current.volume = Number(localStorage.getItem("volume")) / 100;
 
@@ -261,6 +260,7 @@ const App = () => {
           speed,
           flags: {
             boomerang: isBoomerang,
+            fadeout: isFadeout,
           },
         },
         (progress) => setConvertProgress(progress)
@@ -283,11 +283,24 @@ const App = () => {
   };
 
   const loadVideo = async () => {
-    const video = fileInputRef?.current?.files?.[0];
+    let video = fileInputRef?.current?.files?.[0];
     if (!video) return;
+    const name = video.name;
+
+    if (["gif"].includes(name.split(".").slice(-1)[0])) {
+      video = await convertToCorrectFormat(video, (p) =>
+        setConvertProgress({ message: p })
+      );
+    } else if (["ts"].includes(name.split(".").slice(-1)[0])) {
+      const mediaSource = await liveTranscodeTs(video, (p) =>
+        setConvertProgress({ message: p })
+      );
+      video = mediaSource as any;
+    }
+    console.log(URL.createObjectURL(video), video);
     setVideoSrc({
       url: URL.createObjectURL(video),
-      title: video.name.split(".").slice(undefined, -1).join(""),
+      title: name.split(".").slice(undefined, -1).join(""),
       type: "upload",
       quality: "local",
     });
@@ -327,7 +340,7 @@ const App = () => {
               <Typography size="text-xl" weight="font-bold" align="text-center">
                 Source Video
               </Typography>
-              <div className="relative">
+              <div className="relative max-w-full h-full w-full">
                 <Cropper
                   ref={cropperRef}
                   onUpdateCrop={(position, dimension) => {
@@ -339,7 +352,8 @@ const App = () => {
                   <video
                     ref={videoRef}
                     src={video?.url}
-                    className="w-full mb-2 "
+                    style={{ maxHeight: "500px" }}
+                    className="w-full mb-2 h-full"
                     onVolumeChange={(e) => {
                       setVolume((e.target as HTMLVideoElement).volume * 100);
                     }}
@@ -480,7 +494,7 @@ const App = () => {
                     ref={fileInputRef}
                     type="file"
                     className="p-2 mr-2 rounded border w-full border-black block text-overflow-ellipsis overflow-hidden whitespace-nowrap"
-                    accept="video/*, .mkv"
+                    accept="video/*, .mkv, .ts, .gif"
                   />
                   <Button
                     color="bg-red-500"
@@ -710,6 +724,17 @@ const App = () => {
                   onChange={(e) => setBoomerang(e.target.checked)}
                 />
               </div>
+              <div className="flex items-center">
+                <Typography size="text-md" margin="mr-2">
+                  Fadeout
+                </Typography>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={isFadeout}
+                  onChange={(e) => setFadeout(e.target.checked)}
+                />
+              </div>
             </Section>
             <Section sub>
               <Typography weight="font-bold" size="text-lg" type="h3">
@@ -745,11 +770,7 @@ const App = () => {
               <Typography weight="font-bold" size="text-lg" type="h3">
                 Convert
               </Typography>
-              <Button
-                color={!isFFMpegLoading ? "bg-blue-400" : "bg-gray-500"}
-                onClick={convert}
-                disabled={isFFMpegLoading}
-              >
+              <Button color={"bg-blue-400"} onClick={convert}>
                 Convert
               </Button>
               <Button
