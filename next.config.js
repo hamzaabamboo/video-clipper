@@ -1,7 +1,5 @@
 module.exports = {
-  future: {
-    webpack5: true,
-  },
+  webpack5: true,
   webpack: (config, { isServer, dev, webpack }) => {
     config.output.chunkFilename = isServer
       ? `${dev ? "[name]" : "[name].[fullhash]"}.js`
