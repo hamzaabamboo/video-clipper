@@ -1,4 +1,3 @@
 /// <reference types="next" />
 /// <reference types="next/types/global" />
-
-declare namespace Gifsicle {}
+/// <reference types="next/image-types/global" />

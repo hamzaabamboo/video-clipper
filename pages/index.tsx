@@ -28,14 +28,13 @@ const App = () => {
   const [duration, setDuration] = useState<number>(0);
   const [progress, setProgress] = useState<number>(0);
   const [volume, setVolume] = useState<number>(50);
-  const [video, setVideoSrc] =
-    useState<{
-      url: string;
-      title: string;
-      type: SourceType;
-      mediaSrc?: MediaSource;
-      quality: number | "local";
-    }>();
+  const [video, setVideoSrc] = useState<{
+    url: string;
+    title: string;
+    type: SourceType;
+    mediaSrc?: MediaSource;
+    quality: number | "local";
+  }>();
 
   const [videoTitle, setVideoTitle] = useState<string>();
   const [videoRes, setVideoRes] = useState<any[]>([]);
@@ -44,19 +43,17 @@ const App = () => {
   const [clip, setClip] = useState<[number, number]>([0, 0]);
   const [fps, setFps] = useState<number>(30);
   const [loop, setLoop] = useState<boolean>(true);
-  const [res, setRes] =
-    useState<{
-      src: string;
-      type: string;
-      name: string;
-      size: number;
-    }>();
+  const [res, setRes] = useState<{
+    src: string;
+    type: string;
+    name: string;
+    size: number;
+  }>();
   const [mode, setMode] = useState<SourceType>("youtube");
-  const [convertProgress, setConvertProgress] =
-    useState<{
-      message: string;
-      ratio?: number;
-    }>();
+  const [convertProgress, setConvertProgress] = useState<{
+    message: string;
+    ratio?: number;
+  }>();
 
   const [dimension, setDimensions] = useState<Dimension>({
     width: 0,
@@ -84,6 +81,7 @@ const App = () => {
   const [isCropping, setCropping] = useState<boolean>(false);
   const [isBoomerang, setBoomerang] = useState<boolean>(false);
   const [isFadeout, setFadeout] = useState<boolean>(false);
+  const [isLooping, setLooping] = useState<boolean>(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const cropperRef = useRef<any>(null);
@@ -261,6 +259,7 @@ const App = () => {
           flags: {
             boomerang: isBoomerang,
             fadeout: isFadeout,
+            loop: isLooping,
           },
         },
         (progress) => setConvertProgress(progress)
@@ -297,7 +296,6 @@ const App = () => {
       );
       video = mediaSource as any;
     }
-    console.log(URL.createObjectURL(video), video);
     setVideoSrc({
       url: URL.createObjectURL(video),
       title: name.split(".").slice(undefined, -1).join(""),
@@ -733,6 +731,17 @@ const App = () => {
                   className="h-4 w-4"
                   checked={isFadeout}
                   onChange={(e) => setFadeout(e.target.checked)}
+                />
+              </div>{" "}
+              <div className="flex items-center">
+                <Typography size="text-md" margin="mr-2">
+                  Loop
+                </Typography>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={isLooping}
+                  onChange={(e) => setLooping(e.target.checked)}
                 />
               </div>
             </Section>

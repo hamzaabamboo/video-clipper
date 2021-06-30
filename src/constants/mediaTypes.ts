@@ -1,4 +1,12 @@
-export const MEDIA_TYPES = {
+export const MEDIA_TYPES: Record<
+  string,
+  {
+    type: string;
+    extension: string;
+    convertExtension?: string;
+    mimetype: string;
+  }
+> = {
   mp4: {
     type: "video",
     extension: "mp4",
@@ -43,5 +51,11 @@ export const MEDIA_TYPES = {
     type: "image",
     extension: "jpg",
     mimetype: "image/jpg",
+  },
+  apng: {
+    type: "image",
+    convertExtension: "apng",
+    extension: "png",
+    mimetype: "image/apng",
   },
 };

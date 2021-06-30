@@ -45,14 +45,23 @@ export const clipStream = async (
   try {
     verbose("[clipper] downloading info");
 
-    const { extension, mimetype, type: outType } = MEDIA_TYPES[type];
+    const {
+      extension,
+      mimetype,
+      type: outType,
+      convertExtension,
+    } = MEDIA_TYPES[type];
 
     const filenameInternal = `${encodeURIComponent(title)}`;
     const tmpname = source.name;
     const outname =
       type !== "gif" && outType === "image"
-        ? `out_${quality}_${start}_${x}_${y}_${width}_${height}.${extension}`
-        : `out-${filenameInternal}_${quality}_${start}_${end}_${scale}_${fps}_${x}_${y}_${width}_${height}_${speed}_${boomerang}.${extension}`;
+        ? `out_${quality}_${start}_${x}_${y}_${width}_${height}.${
+            convertExtension ?? extension
+          }`
+        : `out-${filenameInternal}_${quality}_${start}_${end}_${scale}_${fps}_${x}_${y}_${width}_${height}_${speed}_${boomerang}.${
+            convertExtension ?? extension
+          }`;
 
     const args = getArgs("/input/tmpfile", outname, type, duration, options);
 
@@ -109,7 +118,7 @@ const getArgs = (
   const { fps, scale, crop, speed, flags } = options;
   const { start, end } = duration;
   const { x, y, width, height } = crop;
-  const { boomerang, fadeout } = flags;
+  const { boomerang, fadeout, loop } = flags;
   const { type: outType } = MEDIA_TYPES[type];
   const args: string[] = [];
 
@@ -164,9 +173,9 @@ const getArgs = (
         }`
       );
     }
-    if (type === "gif")
+    if (type === "gif" || type === "apng")
       filterComplex.push(
-        "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2:diff_mode=rectangle"
+        "split[s0][s1];[s0]palettegen=reserve_transparent=on:transparency_color=ffffff:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2:diff_mode=rectangle"
       );
 
     if (filterComplex.length > 0) {
@@ -184,6 +193,12 @@ const getArgs = (
   }
 
   switch (type) {
+    case "apng":
+      args.push("-dpi", "256");
+      if (loop) {
+        args.push("-plays", "0");
+      }
+      break;
     case "png":
       args.push("-vframes", "1");
       break;
