@@ -8,7 +8,7 @@ It basically runs ffmpeg commands for you with an interface for you to configure
 
 Powered by [ffmpeg-wasm](https://github.com/ffmpegwasm/ffmpeg.wasm), [Nestjs](https://github.com/nestjs/nest), React and TypeScript
 
-Try me now ! : http://video-clipper.herokuapp.com/
+Try me now ! : http://video-clipper.herokuapp.com/ or http://video-clipper-coral.vercel.com/
 
 ![screenshot](samples/screenshot.png)
 
@@ -23,12 +23,13 @@ docker run -p 3000:3000 hamzaabamboo/video-clipper
 ## Features
 
 - Choose YouTube video as source
-- Choose local file as source
+- Choose local file as video source (Supports most video formats + GIFs)
 - Crop video
 - Trim video
 - Simple user interface (?)
+- Optimized GIF creation
 - Export to multiple formats
-  - Image: GIF
+  - Image: GIF, JPG, PNG, APNG
   - Video: MP4, FLV, WebP, mov
   - Audio: mp3, wav
 - Instagram boomerang effect

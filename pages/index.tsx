@@ -8,7 +8,7 @@ import { Textfield } from "components/forms/Textfield";
 import { Section } from "components/Section";
 import { Typography } from "components/Typography";
 import { MEDIA_TYPES } from "constants/mediaTypes";
-import { clipStream, ffmpeg } from "lib/clipper";
+import { clipStream } from "lib/clipper";
 import { convertToCorrectFormat } from "lib/convertToCorrectFormat";
 import { downloadVideo } from "lib/downloadVideo";
 import { liveTranscodeTs } from "lib/liveTranscode";
@@ -328,9 +328,13 @@ const App = () => {
     <div className="flex justify-start flex-col items-center min-h-screen w-screen py-2">
       <div>
         <Typography size="text-3xl" weight="font-bold" align="text-center">
-          Video Clipping Tool V2.0!
+          Video Clipping Tool V2.1!
         </Typography>
       </div>
+      <Typography size="text-md" align="text-center">
+        How to use: Select youtube video/ local video &rarr; Slide around and
+        set start/end times &rarr; Convert !
+      </Typography>
       <div className="flex flex-col lg:flex-row py-2 px-4 w-full lg:h-full">
         <div className="flex flex-col p-2 w-full lg:w-4/5 justify-start xl:justify-between">
           <div className="xl:h-full flex flex-col flex-grow-0 xl:justify-center">
