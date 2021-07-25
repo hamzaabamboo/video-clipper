@@ -1,6 +1,11 @@
 import axios from "axios";
 import { Button } from "components/Button";
-import { Coordinate, Cropper, Dimension } from "components/Cropper";
+import {
+  ASPECT_RATIOS,
+  Coordinate,
+  Cropper,
+  Dimension,
+} from "components/Cropper";
 import { NumberField } from "components/forms/NumberField";
 import { Select } from "components/forms/Select";
 import { Slider } from "components/forms/Slider";
@@ -68,6 +73,7 @@ const App = () => {
     x: 0,
     y: 0,
   });
+  const [aspectRatio, setAspectRatio] = useState<keyof typeof ASPECT_RATIOS>();
 
   const [outFilename, setOutFilename] = useState<string>();
   const [outType, setOutType] = useState<keyof typeof MEDIA_TYPES>("gif");
@@ -345,6 +351,7 @@ const App = () => {
               <div className="relative max-w-full h-full w-full">
                 <Cropper
                   ref={cropperRef}
+                  aspectRatio={aspectRatio}
                   onUpdateCrop={(position, dimension) => {
                     setCropDimesion(dimension);
                     setCropPosition(position);
@@ -355,7 +362,7 @@ const App = () => {
                     ref={videoRef}
                     src={video?.url}
                     style={{ maxHeight: "500px" }}
-                    className="w-full mb-2 h-full"
+                    className=" mb-2 "
                     onVolumeChange={(e) => {
                       setVolume((e.target as HTMLVideoElement).volume * 100);
                     }}
@@ -708,6 +715,21 @@ const App = () => {
                   >
                     Reset Crop
                   </Button>
+                  <Select
+                    value={aspectRatio}
+                    onChange={(e) =>
+                      setAspectRatio(
+                        e.target.value as keyof typeof ASPECT_RATIOS
+                      )
+                    }
+                  >
+                    <option value={undefined}>None</option>
+                    {Object.keys(ASPECT_RATIOS).map((e) => (
+                      <option key={e} value={e}>
+                        {e}
+                      </option>
+                    ))}
+                  </Select>
                 </div>
               </div>
             </Section>

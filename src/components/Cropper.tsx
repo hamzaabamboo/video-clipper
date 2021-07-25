@@ -1,4 +1,5 @@
 import React, { forwardRef, useImperativeHandle, useRef } from "react";
+import { useEffect } from "react";
 
 export interface Coordinate {
   x: number;
@@ -10,14 +11,21 @@ export interface Dimension {
   height: number;
 }
 
+export const ASPECT_RATIOS = {
+  square: [1, 1],
+  fourThree: [4, 3],
+  wide: [16, 8],
+};
+
 export const Cropper = forwardRef<
   any,
   {
     isCropping: boolean;
     onUpdateCrop: (position: Coordinate, dimension: Dimension) => void;
     children: React.ReactNode;
+    aspectRatio?: keyof typeof ASPECT_RATIOS;
   }
->(({ isCropping, children, onUpdateCrop }, ref) => {
+>(({ isCropping, children, onUpdateCrop, aspectRatio = "square" }, ref) => {
   const cropPositionRef = useRef<Coordinate>({
     x: 0,
     y: 0,
@@ -141,16 +149,34 @@ export const Cropper = forwardRef<
             cropPositionRef.current.y * rect.height +
             event.movementY;
           const cropper = cropperRef.current as HTMLDivElement;
-          const xDim = xOff / rect.width;
-          const yDim = yOff / rect.height;
-          console.log(xDim, yDim);
-          if (yOff > 0 && yOff < rect.height) {
-            cropDimensionRef.current.height = yDim;
-            cropper.style.height = yDim * 100 + "%";
-          }
-          if (xOff > 0 && xOff < rect.width) {
-            cropDimensionRef.current.width = xDim;
-            cropper.style.width = xDim * 100 + "%";
+          if (aspectRatio && aspectRatio in ASPECT_RATIOS) {
+            const mag = Math.max(xOff, yOff);
+
+            const factor =
+              ASPECT_RATIOS[aspectRatio][1] / ASPECT_RATIOS[aspectRatio][0];
+            const newHeight = mag / rect.height;
+            const newWidth = mag / rect.width;
+            if (
+              newHeight + cropPositionRef.current.y > 1 ||
+              newWidth + cropPositionRef.current.x > 1
+            )
+              return;
+            cropDimensionRef.current.height = newHeight * factor;
+            cropper.style.height = newHeight * factor * 100 + "%";
+            cropDimensionRef.current.width = newWidth;
+            cropper.style.width = newWidth * 100 + "%";
+          } else {
+            const xDim = xOff / rect.width;
+            const yDim = yOff / rect.height;
+
+            if (yOff > 0 && yOff < rect.height) {
+              cropDimensionRef.current.height = yDim;
+              cropper.style.height = yDim * 100 + "%";
+            }
+            if (xOff > 0 && xOff < rect.width) {
+              cropDimensionRef.current.width = xDim;
+              cropper.style.width = xDim * 100 + "%";
+            }
           }
         }
       }
@@ -177,8 +203,29 @@ export const Cropper = forwardRef<
       };
     };
 
+  useEffect(() => {
+    if (!aspectRatio || !(aspectRatio in ASPECT_RATIOS)) return;
+    const t = parentRef.current as HTMLDivElement;
+    const rect = t.getBoundingClientRect();
+    const { x, y } = cropPositionRef.current;
+    const { width, height } = cropDimensionRef.current;
+    const aspectFactor =
+      ASPECT_RATIOS[aspectRatio][1] / ASPECT_RATIOS[aspectRatio][0];
+    const expectedHeight = width * aspectFactor * rect.width;
+    if (y + expectedHeight / rect.height < 1) {
+      cropDimensionRef.current.height = expectedHeight / rect.height;
+    } else {
+      const expectWidth = (height / aspectFactor) * rect.height;
+      cropDimensionRef.current.width = expectWidth / rect.width;
+    }
+    updateCrop();
+  }, [aspectRatio]);
   return (
-    <div ref={parentRef} className="relative">
+    <div
+      ref={parentRef}
+      className="relative mx-auto"
+      style={{ width: "fit-content" }}
+    >
       <div
         className="absolute z-20"
         ref={cropperRef}
@@ -187,7 +234,7 @@ export const Cropper = forwardRef<
         }}
       >
         <div
-          className="bg-gray-500 w-full h-full opacity-25 z-30"
+          className="bg-gray-500 w-full h-full opacity-25 z-30 border border-black"
           draggable
           onMouseDown={handleDrag("all")}
           onDragStart={() => {
@@ -213,9 +260,7 @@ export const Cropper = forwardRef<
           }}
         ></div>
       </div>
-      <div className="h-full w-full" >
-        {children}
-      </div>
+      <div className="w-min">{children}</div>
     </div>
   );
 });
