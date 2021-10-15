@@ -25,7 +25,9 @@ export const downloadVideo = async (
 
   const {
     data: { size: filesize },
-  } = await axios.get("api/getSize?url=" + url + "&quality=" + quality);
+  } = await axios.get<{ size: number }>(
+    "api/getSize?url=" + url + "&quality=" + quality
+  );
   const arr = new Uint8Array(
     (
       await axios.get("api/dlVid?url=" + url + "&quality=" + quality, {
