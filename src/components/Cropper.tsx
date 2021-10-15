@@ -25,7 +25,7 @@ export const Cropper = forwardRef<
     children: React.ReactNode;
     aspectRatio?: keyof typeof ASPECT_RATIOS;
   }
->(({ isCropping, children, onUpdateCrop, aspectRatio = "square" }, ref) => {
+>(({ isCropping, children, onUpdateCrop, aspectRatio }, ref) => {
   const cropPositionRef = useRef<Coordinate>({
     x: 0,
     y: 0,
