@@ -208,7 +208,7 @@ const App = () => {
     try {
       const {
         data: { title, allFormats },
-      } = await axios.get("api/vid?" + qs.encode({ url }));
+      } = await axios.get<{ title: string, allFormats: any[]}>("api/vid?" + qs.encode({ url }));
       setVideoTitle(title);
       setVideoRes(
         allFormats.filter((e) => e.container === "mp4" && e.hasVideo)
