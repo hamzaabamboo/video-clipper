@@ -1,4 +1,6 @@
-export const Button: React.FC<ButtonProps> = ({
+import { FCWithChildren } from "src/types/FCWithChildren";
+
+export const Button: FCWithChildren<ButtonProps> = ({
   color,
   fontColor,
   onClick,

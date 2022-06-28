@@ -18,7 +18,7 @@ import { convertToCorrectFormat } from "lib/convertToCorrectFormat";
 import { downloadVideo } from "lib/downloadVideo";
 import { liveTranscodeTs } from "lib/liveTranscode";
 import qs from "querystring";
-import { Range } from "rc-slider";
+import Range from "rc-slider";
 import "rc-slider/assets/index.css";
 import React, { useEffect, useRef, useState } from "react";
 import { roundToNDecimalPlaces } from "utils/roundToNDecimal";
@@ -208,7 +208,9 @@ const App = () => {
     try {
       const {
         data: { title, allFormats },
-      } = await axios.get<{ title: string, allFormats: any[]}>("api/vid?" + qs.encode({ url }));
+      } = await axios.get<{ title: string; allFormats: any[] }>(
+        "api/vid?" + qs.encode({ url })
+      );
       setVideoTitle(title);
       setVideoRes(
         allFormats.filter((e) => e.container === "mp4" && e.hasVideo)
@@ -503,7 +505,7 @@ const App = () => {
                     ref={fileInputRef}
                     type="file"
                     className="p-2 mr-2 rounded border w-full border-black block text-overflow-ellipsis overflow-hidden whitespace-nowrap"
-                    accept="video/*, .mkv, .ts, .gif"
+                    accept="video/*, .mkv, .ts, .gif, .webp"
                   />
                   <Button
                     color="bg-red-500"

@@ -1,4 +1,7 @@
-export const Typography: React.FC<TypographyProps> = ({
+import { ReactNode } from "react";
+import { FCWithChildren } from "src/types/FCWithChildren";
+
+export const Typography: FCWithChildren<TypographyProps> = ({
   type,
   size,
   color,

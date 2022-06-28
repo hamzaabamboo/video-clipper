@@ -1,6 +1,7 @@
 import { ChangeEventHandler } from "react";
+import { FCWithChildren } from "src/types/FCWithChildren";
 
-export const Textfield: React.FC<TextFieldProps> = ({
+export const Textfield: FCWithChildren<TextFieldProps> = ({
   value,
   onChange,
   placeholder,
