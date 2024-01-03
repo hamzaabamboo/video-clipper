@@ -1,5 +1,4 @@
 import type createFFmpegCore from "@ffmpeg/core";
-import encode from "@wasm-codecs/gifsicle";
 
 const ctx: Worker = self as any;
 (ctx as any).importScripts("/ffmpeg-core.js");
@@ -30,7 +29,8 @@ class FFmpeg {
   }
 
   log(message) {
-    console.log("ffmpeg:", message);
+    // console.log("ffmpeg:", message);
+    postMessage({ type: "log", data: message });
     this.detectCompletion(message);
   }
 

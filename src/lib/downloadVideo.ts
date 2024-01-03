@@ -32,7 +32,7 @@ export const downloadVideo = async (
     (
       await axios.get("api/dlVid?url=" + url + "&quality=" + quality, {
         responseType: "arraybuffer",
-        onDownloadProgress: (progress: ProgressEvent) => {
+        onDownloadProgress: (progress) => {
           onProgress({
             message: `Downloading... ${
               roundToNDecimalPlaces(progress.loaded / 10 ** 6, 2) ?? 0
