@@ -6,21 +6,21 @@ import {
   Cropper,
   Dimension,
 } from "components/Cropper";
+import { Section } from "components/Section";
+import { Typography } from "components/Typography";
 import { NumberField } from "components/forms/NumberField";
 import { Select } from "components/forms/Select";
 import { Slider } from "components/forms/Slider";
 import { Textfield } from "components/forms/Textfield";
-import { Section } from "components/Section";
-import { Typography } from "components/Typography";
 import { MEDIA_TYPES } from "constants/mediaTypes";
 import { clipStream } from "lib/clipper";
 import { convertToCorrectFormat } from "lib/convertToCorrectFormat";
 import { downloadVideo } from "lib/downloadVideo";
 import { liveTranscodeTs } from "lib/liveTranscode";
 import qs from "querystring";
-import { Range } from "rc-slider";
-import "rc-slider/assets/index.css";
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import RangeSlider from "react-range-slider-input";
+import "react-range-slider-input/dist/style.css";
 import { roundToNDecimalPlaces } from "utils/roundToNDecimal";
 import { sleep } from "utils/sleep";
 
@@ -88,6 +88,11 @@ const App = () => {
   const [isBoomerang, setBoomerang] = useState<boolean>(false);
   const [isFadeout, setFadeout] = useState<boolean>(false);
   const [isLooping, setLooping] = useState<boolean>(false);
+
+  const [logs, setLogs] = useState<string[]>([]);
+
+  const log = (message: string) =>
+    setLogs((s) => [...s, `${new Date().toISOString()} - ${message}`]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const cropperRef = useRef<any>(null);
@@ -208,7 +213,9 @@ const App = () => {
     try {
       const {
         data: { title, allFormats },
-      } = await axios.get("api/vid?" + qs.encode({ url }));
+      } = await axios.get<{ title: string; allFormats: any[] }>(
+        "api/vid?" + qs.encode({ url })
+      );
       setVideoTitle(title);
       setVideoRes(
         allFormats.filter((e) => e.container === "mp4" && e.hasVideo)
@@ -268,7 +275,8 @@ const App = () => {
             loop: isLooping,
           },
         },
-        (progress) => setConvertProgress(progress)
+        (progress) => setConvertProgress(progress),
+        log
       );
 
       if (res?.src) {
@@ -334,7 +342,7 @@ const App = () => {
     <div className="flex justify-start flex-col items-center min-h-screen w-screen py-2">
       <div>
         <Typography size="text-3xl" weight="font-bold" align="text-center">
-          Video Clipping Tool V2.1!
+          Video Clipping Tool V2.2!
         </Typography>
       </div>
       <Typography size="text-md" align="text-center">
@@ -342,7 +350,7 @@ const App = () => {
         set start/end times &rarr; Convert !
       </Typography>
       <div className="flex flex-col lg:flex-row py-2 px-4 w-full lg:h-full">
-        <div className="flex flex-col p-2 w-full lg:w-4/5 justify-start xl:justify-between">
+        <div className="flex flex-col p-2 w-full lg:w-4/5 justify-start xl:justify-between gap-2">
           <div className="xl:h-full flex flex-col flex-grow-0 xl:justify-center">
             <div className={`${video?.url ? "" : "hidden"}`}>
               <Typography size="text-xl" weight="font-bold" align="text-center">
@@ -437,6 +445,16 @@ const App = () => {
               </div>
             )}
           </div>
+          <Section main>
+            <div
+              className="overflow-y-auto break-all"
+              style={{ height: "300px" }}
+            >
+              {logs.map((l, index) => {
+                return <p key={index}>{l}</p>;
+              })}
+            </div>
+          </Section>
         </div>
         <div className="flex grid gap-2 grid-cols-1 xl:grid-cols-2 w-full lg:w-4/5">
           <Section main>
@@ -503,7 +521,7 @@ const App = () => {
                     ref={fileInputRef}
                     type="file"
                     className="p-2 mr-2 rounded border w-full border-black block text-overflow-ellipsis overflow-hidden whitespace-nowrap"
-                    accept="video/*, .mkv, .ts, .gif"
+                    accept="video/*, .mkv, .ts, .gif, .webp"
                   />
                   <Button
                     color="bg-red-500"
@@ -567,22 +585,21 @@ const App = () => {
                   />
                 </div>
                 <div className="px-4 w-100 flex-grow">
-                  <Range
-                    allowCross={false}
+                  <RangeSlider
                     step={0.01}
                     min={0}
                     max={duration}
                     defaultValue={[0, 1]}
                     value={clip}
-                    onBeforeChange={() => {
+                    onRangeDragStart={() => {
                       seekingRef.current = true;
                       videoRef.current?.pause();
                     }}
-                    onAfterChange={() => {
+                    onRangeDragEnd={() => {
                       seekingRef.current = false;
                       videoRef.current?.pause();
                     }}
-                    onChange={(r) => {
+                    onInput={(r) => {
                       if (clip[0] !== r[0]) {
                         updateProgress(r[0]);
                       } else {

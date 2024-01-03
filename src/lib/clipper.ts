@@ -27,7 +27,11 @@ export const clipStream = async (
       boomerang: false,
     },
   },
-  onProgress: (proress: { message: string; ratio?: number }) => void = () => {}
+  onProgress: (progress: {
+    message: string;
+    ratio?: number;
+  }) => void = () => {},
+  onLog?: (message: string) => void
 ): Promise<{ file: Blob; type: string; name: string }> => {
   const { fps, scale, crop, speed, flags, filename } = options;
   const { start, end } = duration;
@@ -82,6 +86,10 @@ export const clipStream = async (
         mimetype,
       });
       worker.onmessage = ({ data }) => {
+        if (data.type === "log") {
+          onLog?.(data.data);
+          return;
+        }
         if ("progress" in data) {
           console.log(data);
           onProgress({

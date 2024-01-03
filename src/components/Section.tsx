@@ -1,4 +1,6 @@
-export const Section: React.FC<{ main?: boolean; sub?: boolean }> = ({
+import { FCWithChildren } from "src/types/FCWithChildren";
+
+export const Section: FCWithChildren<{ main?: boolean; sub?: boolean }> = ({
   children,
   main,
   sub,

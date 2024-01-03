@@ -1,4 +1,5 @@
 import React from "react";
+import { FCWithChildren } from "src/types/FCWithChildren";
 import { NumberField } from "./NumberField";
 
 interface SliderProps {
@@ -9,7 +10,7 @@ interface SliderProps {
   onChange: (val: number) => void;
 }
 
-export const Slider: React.FC<SliderProps> = ({
+export const Slider: FCWithChildren<SliderProps> = ({
   value,
   min,
   max,
