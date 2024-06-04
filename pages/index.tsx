@@ -54,7 +54,7 @@ const App = () => {
     name: string;
     size: number;
   }>();
-  const [mode, setMode] = useState<SourceType>("youtube");
+  const [mode, setMode] = useState<SourceType>("upload");
   const [convertProgress, setConvertProgress] = useState<{
     message: string;
     ratio?: number;
@@ -339,24 +339,24 @@ const App = () => {
   };
 
   return (
-    <div className="flex justify-start flex-col items-center min-h-screen w-screen py-2">
+    <div className="flex flex-col justify-start items-center py-2 w-screen min-h-screen">
       <div>
         <Typography size="text-3xl" weight="font-bold" align="text-center">
-          Video Clipping Tool V2.2!
+          Video Clipping Tool V2.3!
         </Typography>
       </div>
       <Typography size="text-md" align="text-center">
         How to use: Select youtube video/ local video &rarr; Slide around and
         set start/end times &rarr; Convert !
       </Typography>
-      <div className="flex flex-col lg:flex-row py-2 px-4 w-full lg:h-full">
-        <div className="flex flex-col p-2 w-full lg:w-4/5 justify-start xl:justify-between gap-2">
-          <div className="xl:h-full flex flex-col flex-grow-0 xl:justify-center">
+      <div className="flex lg:flex-row flex-col px-4 py-2 w-full lg:h-full">
+        <div className="flex flex-col justify-start xl:justify-between gap-2 p-2 w-full lg:w-4/5">
+          <div className="flex flex-col flex-grow-0 xl:justify-center xl:h-full">
             <div className={`${video?.url ? "" : "hidden"}`}>
               <Typography size="text-xl" weight="font-bold" align="text-center">
                 Source Video
               </Typography>
-              <div className="relative max-w-full h-full w-full">
+              <div className="relative w-full max-w-full h-full">
                 <Cropper
                   ref={cropperRef}
                   aspectRatio={aspectRatio}
@@ -370,7 +370,7 @@ const App = () => {
                     ref={videoRef}
                     src={video?.url}
                     style={{ maxHeight: "500px" }}
-                    className=" mb-2 "
+                    className="mb-2"
                     onVolumeChange={(e) => {
                       setVolume((e.target as HTMLVideoElement).volume * 100);
                     }}
@@ -411,7 +411,7 @@ const App = () => {
                 }`}
             </Typography>
           </div>
-          <div className="xl:h-full flex flex-col flex-grow-0 justify-center">
+          <div className="flex flex-col flex-grow-0 justify-center xl:h-full">
             {res?.src ? (
               <>
                 <Typography
@@ -434,7 +434,7 @@ const App = () => {
                 </div>
               </>
             ) : (
-              <div className="h-64 xl:h-full flex flex-col justify-center">
+              <div className="flex flex-col justify-center h-64 xl:h-full">
                 <Typography
                   align="text-center"
                   weight="font-bold"
@@ -447,7 +447,7 @@ const App = () => {
           </div>
           <Section main>
             <div
-              className="overflow-y-auto break-all"
+              className="flex flex-col-reverse break-all overflow-y-auto"
               style={{ height: "300px" }}
             >
               {logs.map((l, index) => {
@@ -456,18 +456,10 @@ const App = () => {
             </div>
           </Section>
         </div>
-        <div className="flex grid gap-2 grid-cols-1 xl:grid-cols-2 w-full lg:w-4/5">
+        <div className="flex gap-2 grid grid-cols-1 xl:grid-cols-2 w-full lg:w-4/5">
           <Section main>
             <Section sub>
               <div>
-                <Button
-                  color={mode === "youtube" ? "bg-blue-500" : "bg-blue-300"}
-                  fontColor="text-white"
-                  onClick={() => setMode("youtube")}
-                  disabled={mode === "youtube"}
-                >
-                  Youtube Video
-                </Button>
                 <Button
                   color={mode === "upload" ? "bg-blue-500" : "bg-blue-300"}
                   fontColor="text-white"
@@ -476,10 +468,18 @@ const App = () => {
                 >
                   Local Video
                 </Button>
+                <Button
+                  color={mode === "youtube" ? "bg-blue-500" : "bg-blue-300"}
+                  fontColor="text-white"
+                  onClick={() => setMode("youtube")}
+                  disabled={mode === "youtube"}
+                >
+                  Youtube Video
+                </Button>
               </div>
               {mode === "youtube" ? (
                 <div>
-                  <span className="text-lg font-bold mb-2">Enter URL</span>
+                  <span className="mb-2 font-bold text-lg">Enter URL</span>
                   <Textfield
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
@@ -520,7 +520,7 @@ const App = () => {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    className="p-2 mr-2 rounded border w-full border-black block text-overflow-ellipsis overflow-hidden whitespace-nowrap"
+                    className="block mr-2 p-2 border border-black rounded w-full whitespace-nowrap overflow-hidden text-overflow-ellipsis"
                     accept="video/*, .mkv, .ts, .gif, .webp"
                   />
                   <Button
@@ -570,7 +570,7 @@ const App = () => {
               <Typography weight="font-bold" size="text-lg">
                 Trim
               </Typography>
-              <div className="w-80 flex items-center mb-2">
+              <div className="flex items-center mb-2 w-80">
                 <div className="flex-shrink">
                   <NumberField
                     step=".01"
@@ -584,7 +584,7 @@ const App = () => {
                     }}
                   />
                 </div>
-                <div className="px-4 w-100 flex-grow">
+                <div className="flex-grow px-4 w-full">
                   <RangeSlider
                     step={0.01}
                     min={0}
@@ -760,7 +760,7 @@ const App = () => {
                 </Typography>
                 <input
                   type="checkbox"
-                  className="h-4 w-4"
+                  className="w-4 h-4"
                   checked={isBoomerang}
                   onChange={(e) => setBoomerang(e.target.checked)}
                 />
@@ -771,7 +771,7 @@ const App = () => {
                 </Typography>
                 <input
                   type="checkbox"
-                  className="h-4 w-4"
+                  className="w-4 h-4"
                   checked={isFadeout}
                   onChange={(e) => setFadeout(e.target.checked)}
                 />
@@ -782,7 +782,7 @@ const App = () => {
                 </Typography>
                 <input
                   type="checkbox"
-                  className="h-4 w-4"
+                  className="w-4 h-4"
                   checked={isLooping}
                   onChange={(e) => setLooping(e.target.checked)}
                 />

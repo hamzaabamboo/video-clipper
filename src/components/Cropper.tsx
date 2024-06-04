@@ -227,14 +227,14 @@ export const Cropper = forwardRef<
       style={{ width: "fit-content" }}
     >
       <div
-        className="absolute z-20"
+        className="z-20 absolute"
         ref={cropperRef}
         style={{
           display: isCropping ? "block" : "none",
         }}
       >
         <div
-          className="bg-gray-500 w-full h-full opacity-25 z-30 border border-black"
+          className="z-30 bg-gray-500 opacity-25 border border-black w-full h-full"
           draggable
           onMouseDown={handleDrag("all")}
           onDragStart={() => {
@@ -242,7 +242,7 @@ export const Cropper = forwardRef<
           }}
         ></div>
         <div
-          className="w-8 h-8 rounded-full bg-red-600 opacity-75 absolute z-40"
+          className="z-40 absolute bg-red-600 opacity-75 rounded-full w-8 h-8"
           style={{ top: "-1rem", left: "-1rem" }}
           draggable
           onMouseDown={handleDrag("pos")}
@@ -251,7 +251,7 @@ export const Cropper = forwardRef<
           }}
         ></div>
         <div
-          className="w-8 h-8 rounded-full bg-red-600 opacity-75 absolute z-40"
+          className="z-40 absolute bg-red-600 opacity-75 rounded-full w-8 h-8"
           style={{ bottom: "-1rem", right: "-1rem" }}
           draggable
           onMouseDown={handleDrag("size")}

@@ -33,7 +33,7 @@ export const Slider: FCWithChildren<SliderProps> = ({
       <input
         type="range"
         step=".01"
-        className="w-full flex-grow p-2"
+        className="flex-grow p-2 w-full"
         max={max}
         min={min}
         value={value}

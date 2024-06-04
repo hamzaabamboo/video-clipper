@@ -2,7 +2,7 @@ export const NumberField = ({ value, onChange, step, max, min }) => {
   return (
     <input
       type="number"
-      className="p-2 mr-2 rounded shadow-inner shadow-md border w-full"
+      className="shadow-inner shadow-md mr-2 p-2 border rounded w-full"
       step={step}
       max={max}
       min={min}

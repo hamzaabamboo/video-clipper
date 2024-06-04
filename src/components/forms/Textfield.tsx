@@ -9,7 +9,7 @@ export const Textfield: FCWithChildren<TextFieldProps> = ({
   return (
     <input
       type="text"
-      className="p-2 mr-2 rounded shadow-inner shadow-md border w-full"
+      className="shadow-inner shadow-md mr-2 p-2 border rounded w-full"
       value={value}
       placeholder={placeholder ?? ""}
       onChange={onChange}

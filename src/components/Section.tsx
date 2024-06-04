@@ -6,8 +6,8 @@ export const Section: FCWithChildren<{ main?: boolean; sub?: boolean }> = ({
   sub,
 }) => {
   return main ? (
-    <div className="p-4 mb-2 rounded-md shadow-md bg-gray-100">{children}</div>
+    <div className="bg-gray-100 shadow-md mb-2 p-4 rounded-md">{children}</div>
   ) : (
-    <div className="p-4 mb-2 rounded-md border-2 bg-gray-100">{children}</div>
+    <div className="border-2 bg-gray-100 mb-2 p-4 rounded-md">{children}</div>
   );
 };
