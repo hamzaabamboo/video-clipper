@@ -112,7 +112,7 @@ export const clipStream = async (
       });
       const files = await gifsicle.run({
         input: [{ file, name: "input.gif" }],
-        command: [`-O2 --lossy=80 input.gif -o /out/${outname}`],
+        command: [`-O2 --lossy=60 input.gif -o /out/${outname}`],
       });
       file = files[0];
     }

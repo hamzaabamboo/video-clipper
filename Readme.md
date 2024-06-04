@@ -34,6 +34,13 @@ docker run -p 3000:3000 hamzaabamboo/video-clipper
   - Audio: mp3, wav
 - Instagram boomerang effect
 
+## Special Thanks
+
+Big thanks from these libraries that make this possible
+
+- [gifsicle-wasm](https://github.com/renzhezhilu/gifsicle-wasm-browser)
+- [ffmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm)
+
 ## Limitations
 
 - Cannot convert long videos duration (Takes too much time)

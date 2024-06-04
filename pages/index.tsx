@@ -543,7 +543,7 @@ const App = () => {
                     updateProgress(e);
                   }}
                 />
-                <div className="flex items-center">
+                <div className="flex flex-wrap items-center">
                   <Button
                     color="bg-blue-200"
                     onClick={() => {
@@ -841,9 +841,17 @@ const App = () => {
                 Download
               </Button>
               <Typography>
-                {roundToNDecimalPlaces((res?.size ?? 0) / 1000000, 2)} MB (
-                {dimension.width * resScale}x{dimension.height * resScale} px ,{" "}
-                {fps} fps)
+                {roundToNDecimalPlaces((res?.size ?? 0) / 1000000, 2)} MB ( ~
+                {roundToNDecimalPlaces(
+                  dimension.width * resScale * cropDimension.width,
+                  2
+                )}
+                x
+                {roundToNDecimalPlaces(
+                  dimension.height * resScale * cropDimension.height,
+                  2
+                )}{" "}
+                px , {fps} fps)
               </Typography>
             </Section>
           </Section>
