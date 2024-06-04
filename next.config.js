@@ -2,6 +2,7 @@ module.exports = {
   experimental: {
     reactCompiler: true,
   },
+  transpilePackages: ["gifsicle-wasm-browser"],
   async headers() {
     return [
       {

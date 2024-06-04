@@ -23,6 +23,9 @@ dependencies:
   ffmpeg.js:
     specifier: ^4.2.9003
     version: 4.2.9003
+  gifsicle-wasm-browser:
+    specifier: ^1.5.16
+    version: 1.5.16
   next:
     specifier: 15.0.0-rc.0
     version: 15.0.0-rc.0(babel-plugin-react-compiler@0.0.0-experimental-938cd9a-20240601)(react-dom@19.0.0-rc.0)(react@19.0.0-rc.0)
@@ -855,6 +858,10 @@ packages:
 
   /function-bind@1.1.2:
     resolution: {integrity: sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA==}
+    dev: false
+
+  /gifsicle-wasm-browser@1.5.16:
+    resolution: {integrity: sha512-Ewcx93IlZwVZjqvFxFdE4uIc/q01y598BXpjzt5vAOvNFKcl/nVp4WZwmtINAtkXKr5RP1HJ5QRdnTqET3fLkQ==}
     dev: false
 
   /glob-parent@5.1.2:

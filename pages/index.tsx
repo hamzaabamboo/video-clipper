@@ -6,6 +6,7 @@ import {
   Cropper,
   Dimension,
 } from "components/Cropper";
+import { MessageLog } from "components/MessageLog";
 import { Section } from "components/Section";
 import { Typography } from "components/Typography";
 import { NumberField } from "components/forms/NumberField";
@@ -87,6 +88,7 @@ const App = () => {
   const [isCropping, setCropping] = useState<boolean>(false);
   const [isBoomerang, setBoomerang] = useState<boolean>(false);
   const [isFadeout, setFadeout] = useState<boolean>(false);
+  const [isOptimizeGif, setOptimizeGif] = useState<boolean>(true);
   const [isLooping, setLooping] = useState<boolean>(false);
 
   const [logs, setLogs] = useState<string[]>([]);
@@ -273,6 +275,7 @@ const App = () => {
             boomerang: isBoomerang,
             fadeout: isFadeout,
             loop: isLooping,
+            optimizeGif: isOptimizeGif,
           },
         },
         (progress) => setConvertProgress(progress),
@@ -446,14 +449,7 @@ const App = () => {
             )}
           </div>
           <Section main>
-            <div
-              className="flex flex-col-reverse break-all overflow-y-auto"
-              style={{ height: "300px" }}
-            >
-              {logs.map((l, index) => {
-                return <p key={index}>{l}</p>;
-              })}
-            </div>
+            <MessageLog logs={logs} />
           </Section>
         </div>
         <div className="flex gap-2 grid grid-cols-1 xl:grid-cols-2 w-full lg:w-4/5">
@@ -785,6 +781,18 @@ const App = () => {
                   className="w-4 h-4"
                   checked={isLooping}
                   onChange={(e) => setLooping(e.target.checked)}
+                />
+              </div>
+              <div className="flex items-center">
+                <Typography size="text-md" margin="mr-2">
+                  Optimize (GIF Only)
+                </Typography>
+                <input
+                  type="checkbox"
+                  className="w-4 h-4"
+                  disabled={outType !== "gif"}
+                  checked={isOptimizeGif}
+                  onChange={(e) => setOptimizeGif(e.target.checked)}
                 />
               </div>
             </Section>

@@ -1,5 +1,6 @@
 import { ClippingOptions, Duration } from "src/types/clipping";
 import { MEDIA_TYPES } from "../constants/mediaTypes";
+import gifsicle from "gifsicle-wasm-browser";
 
 export const verbose = (e: string) => console.log(e);
 
@@ -25,6 +26,7 @@ export const clipStream = async (
     speed: 1,
     flags: {
       boomerang: false,
+      optimizeGif: true,
     },
   },
   onProgress: (progress: {
@@ -36,7 +38,7 @@ export const clipStream = async (
   const { fps, scale, crop, speed, flags, filename } = options;
   const { start, end } = duration;
   const { x, y, width, height } = crop;
-  const { boomerang } = flags;
+  const { boomerang, optimizeGif } = flags;
 
   const dur = Number(end) - Number(start);
   if (type === "gif" && dur > 60) {
@@ -71,7 +73,7 @@ export const clipStream = async (
 
     console.log(args);
 
-    const file: File = await new Promise((resolve, reject) => {
+    let file: File = await new Promise((resolve, reject) => {
       const worker = new Worker(
         //@ts-ignore
         new URL("../../src/worker/worker.ts", import.meta.url),
@@ -104,7 +106,19 @@ export const clipStream = async (
         resolve(data);
       };
     });
-
+    if (type === "gif" && optimizeGif) {
+      onProgress({
+        message: "Optimizing Gif",
+      });
+      const files = await gifsicle.run({
+        input: [{ file, name: "input.gif" }],
+        command: [`-O2 --lossy=80 input.gif -o /out/${outname}`],
+      });
+      file = files[0];
+    }
+    onProgress({
+      message: "Done !",
+    });
     return {
       file,
       type: outType,

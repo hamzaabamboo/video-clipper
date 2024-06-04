@@ -24,4 +24,5 @@ export interface Flags {
   boomerang?: boolean;
   fadeout?: boolean;
   loop?: boolean;
+  optimizeGif?: boolean;
 }
