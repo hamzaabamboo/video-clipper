@@ -1,6 +1,7 @@
 import { ClippingOptions, Duration } from "src/types/clipping";
 import { MEDIA_TYPES } from "../constants/mediaTypes";
 import gifsicle from "gifsicle-wasm-browser";
+import { ID3Writer } from "browser-id3-writer";
 
 export const verbose = (e: string) => console.log(e);
 
@@ -21,13 +22,13 @@ export const clipStream = async (
       x: 0,
       y: 0,
       width: 1,
-      height: 1,
+      height: 1
     },
     speed: 1,
     flags: {
       boomerang: false,
-      optimizeGif: true,
-    },
+      optimizeGif: true
+    }
   },
   onProgress: (progress: {
     message: string;
@@ -35,7 +36,7 @@ export const clipStream = async (
   }) => void = () => {},
   onLog?: (message: string) => void
 ): Promise<{ file: Blob; type: string; name: string }> => {
-  const { fps, scale, crop, speed, flags, filename } = options;
+  const { fps, scale, crop, speed, flags, filename, metadata } = options;
   const { start, end } = duration;
   const { x, y, width, height } = crop;
   const { boomerang, optimizeGif } = flags;
@@ -55,7 +56,7 @@ export const clipStream = async (
       extension,
       mimetype,
       type: outType,
-      convertExtension,
+      convertExtension
     } = MEDIA_TYPES[type];
 
     const filenameInternal = `${encodeURIComponent(title)}`;
@@ -86,6 +87,7 @@ export const clipStream = async (
         output: outname,
         outname: `${filename ?? filenameInternal}.${extension}`,
         mimetype,
+        albumArt: metadata?.albumArt
       });
       worker.onmessage = ({ data }) => {
         if (data.type === "log") {
@@ -95,34 +97,61 @@ export const clipStream = async (
         if ("progress" in data) {
           console.log(data);
           onProgress({
-            message: data.progress,
+            message: data.progress
           });
           return;
         }
         if ("error" in data) reject(data.error);
         onProgress({
-          message: "Done",
+          message: "Done"
         });
         resolve(data);
       };
     });
+
+    if (type === "mp3" && metadata) {
+      onProgress({
+        message: "Writing metadata"
+      });
+      const writer = new ID3Writer(await file.arrayBuffer());
+      if (metadata.title) {
+        writer.setFrame("TIT2", metadata.title);
+      }
+      if (metadata.artist) {
+        writer.setFrame("TPE1", [metadata.artist]);
+      }
+      if (metadata.album) {
+        writer.setFrame("TALB", metadata.album);
+      }
+      if (metadata.albumArt) {
+        const albumArtBuffer = await metadata.albumArt.arrayBuffer();
+        writer.setFrame("APIC", {
+          type: 3,
+          data: albumArtBuffer,
+          description: "Cover"
+        });
+      }
+      writer.addTag();
+      file = new File([writer.getBlob()], file.name, { type: file.type });
+    }
+
     if (type === "gif" && optimizeGif) {
       onProgress({
-        message: "Optimizing Gif",
+        message: "Optimizing Gif"
       });
       const files = await gifsicle.run({
         input: [{ file, name: "input.gif" }],
-        command: [`-O2 --lossy=60 input.gif -o /out/${outname}`],
+        command: [`-O2 --lossy=60 input.gif -o /out/${outname}`]
       });
       file = files[0];
     }
     onProgress({
-      message: "Done !",
+      message: "Done !"
     });
     return {
       file,
       type: outType,
-      name: `${filename ?? filenameInternal}.${extension}`,
+      name: `${filename ?? filenameInternal}.${extension}`
     };
   } catch (error) {
     console.log(error);
@@ -231,6 +260,9 @@ const getArgs = (
       args.push("-c:v", "libx264");
       break;
     case "gif":
+      break;
+    case "mp3":
+      args.push("-c:a", "libmp3lame", "-q:a", "2");
       break;
   }
 

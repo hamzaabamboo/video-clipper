@@ -25,6 +25,8 @@ import "react-range-slider-input/dist/style.css";
 import { roundToNDecimalPlaces } from "utils/roundToNDecimal";
 import { sleep } from "utils/sleep";
 
+import { MetadataOptions } from "src/types/clipping";
+
 const DEFAULT_WIDTH = 720;
 type SourceType = "youtube" | "upload";
 const App = () => {
@@ -92,6 +94,7 @@ const App = () => {
   const [isLooping, setLooping] = useState<boolean>(false);
 
   const [logs, setLogs] = useState<string[]>([]);
+  const [metadata, setMetadata] = useState<MetadataOptions>({});
 
   const log = (message: string) =>
     setLogs((s) => [...s, `${new Date().toISOString()} - ${message}`]);
@@ -148,7 +151,7 @@ const App = () => {
       setResScale(
         (DEFAULT_WIDTH / videoRef.current?.videoWidth > 1
           ? 1
-          : DEFAULT_WIDTH / videoRef.current?.videoWidth) ?? 1
+          : DEFAULT_WIDTH / videoRef.current?.videoWidth)
       );
       console.log(Number(localStorage.getItem("volume")) / 100);
       videoRef.current.volume = Number(localStorage.getItem("volume")) / 100;
@@ -277,6 +280,7 @@ const App = () => {
             loop: isLooping,
             optimizeGif: isOptimizeGif,
           },
+          metadata,
         },
         (progress) => setConvertProgress(progress),
         log
@@ -711,6 +715,51 @@ const App = () => {
                   <Button onClick={() => setSpeed(2)}>2x</Button>
                 </div>
               </div>
+              {outType === "mp3" && (
+                <Section sub>
+                  <Typography weight="font-bold" size="text-lg" type="h3">
+                    MP3 Metadata
+                  </Typography>
+                  <div className="flex flex-col gap-2">
+                    <Textfield
+                      label="Title"
+                      value={metadata.title}
+                      onChange={(e) =>
+                        setMetadata({ ...metadata, title: e.target.value })
+                      }
+                    />
+                    <Textfield
+                      label="Artist"
+                      value={metadata.artist}
+                      onChange={(e) =>
+                        setMetadata({ ...metadata, artist: e.target.value })
+                      }
+                    />
+                    <Textfield
+                      label="Album"
+                      value={metadata.album}
+                      onChange={(e) =>
+                        setMetadata({ ...metadata, album: e.target.value })
+                      }
+                    />
+                    <div>
+                      <Typography weight="font-bold" size="text-md">
+                        Album Art
+                      </Typography>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) =>
+                          setMetadata({
+                            ...metadata,
+                            albumArt: e.target.files?.[0],
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </Section>
+              )}
               <div>
                 <Typography weight="font-bold" size="text-lg" type="h3">
                   Crop

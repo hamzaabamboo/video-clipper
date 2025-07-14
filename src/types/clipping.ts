@@ -10,6 +10,13 @@ export interface Duration {
   end?: number;
 }
 
+export interface MetadataOptions {
+  title?: string;
+  artist?: string;
+  album?: string;
+  albumArt?: File;
+}
+
 export interface ClippingOptions {
   fps?: number;
   scale?: number;
@@ -18,6 +25,7 @@ export interface ClippingOptions {
   crop?: CroppingOptions;
   speed: number;
   flags?: Flags;
+  metadata?: MetadataOptions;
 }
 
 export interface Flags {

@@ -17,7 +17,7 @@ class FFmpeg {
     /* Disable interaction mode */
     "-nostdin",
     /* Force to override output file */
-    "-y",
+    "-y"
   ];
 
   detectCompletion(message) {
@@ -36,6 +36,7 @@ class FFmpeg {
 
   async createCore() {
     try {
+      //@ts-expect-error workerfs
       return await createFFmpegCore({
         mainScriptUrlOrBlob: "/ffmpeg-core.js",
         printErr: (message) => this.log(message),
@@ -48,7 +49,7 @@ class FFmpeg {
             return "/ffmpeg-core.worker.js";
           }
           return prefix + path;
-        },
+        }
       });
     } catch (e) {
       if (e.message === "bad memory") {
@@ -66,27 +67,32 @@ class FFmpeg {
     this.ffmpegCore = await this.createCore();
     this.ffmpegMain = this.ffmpegCore.cwrap("proxy_main", "number", [
       "number",
-      "number",
+      "number"
     ]);
     return "Loaded ffmpeg";
   }
 
-  updateFile(newFile) {
-    this.videoFile = newFile;
+  mountFiles(files) {
     const FS = this.ffmpegCore.FS;
     const rootDirs = FS.readdir("/");
     if (rootDirs.indexOf("input") === -1) {
       FS.mkdir("/input");
     } else {
-      this.ffmpegCore.FS_unmount("/input");
+      try {
+        this.ffmpegCore.FS_unmount("/input");
+      } catch (e) {
+        // It's okay if this fails
+      }
     }
     if (rootDirs.indexOf("output") === -1) {
       FS.mkdir("/output");
     }
 
     const WORKERFS = this.ffmpegCore.FS_filesystems.WORKERFS;
-    const tmpfile = new File([newFile], "tmpfile", { type: newFile.type });
-    this.ffmpegCore.FS_mount(WORKERFS, { files: [tmpfile] }, "/input");
+    const filesToMount = files.map(
+      (f) => new File([f.file], f.name, { type: f.file.type })
+    );
+    this.ffmpegCore.FS_mount(WORKERFS, { files: filesToMount }, "/input");
   }
 
   parseArgs(args) {
@@ -152,13 +158,13 @@ const readFile = (file) => ffmpeg.FS("readFile", file);
 const ffmpeg = new FFmpeg();
 
 ctx.onmessage = async ({
-  data: { file, args, output, outname, mimetype, isStream },
+  data: { file, args, output, outname, mimetype, isStream, albumArt }
 }) => {
   let part = 0;
 
   const onProgress = (msg: string) => {
     ctx.postMessage({
-      progress: msg,
+      progress: msg
     });
   };
 
@@ -169,7 +175,12 @@ ctx.onmessage = async ({
       ffmpeg.FS("readFile", output);
     } catch {
       onProgress("Loading Video Data");
-      ffmpeg.updateFile(file);
+      const filesToMount = [{ file, name: "tmpfile" }];
+      if (albumArt) {
+        onProgress("Loading Album Art");
+        filesToMount.push({ file: albumArt, name: "cover.jpg" });
+      }
+      ffmpeg.mountFiles(filesToMount);
       onProgress("Running FFMpeg");
       if (isStream) {
         setInterval(() => {
@@ -178,8 +189,8 @@ ctx.onmessage = async ({
             ctx.postMessage({
               segment: {
                 part,
-                buffer: readFile(`/output/${part}.mp4`),
-              },
+                buffer: readFile(`/output/${part}.mp4`)
+              }
             });
             part++;
           }
@@ -191,8 +202,8 @@ ctx.onmessage = async ({
           ctx.postMessage({
             segment: {
               part,
-              buffer: readFile(`/output/${part}.mp4`),
-            },
+              buffer: readFile(`/output/${part}.mp4`)
+            }
           });
           part++;
         }
@@ -238,7 +249,7 @@ ctx.onmessage = async ({
   } catch (e) {
     console.error(e);
     ctx.postMessage({
-      error: e,
+      error: e
     });
   }
 };
