@@ -1,3 +1,5 @@
+import { useRef } from "react";
+
 export const MessageLog = ({ logs }: { logs: string[] }) => {
   const messageEndRef = useRef<HTMLDivElement>(null);
 
