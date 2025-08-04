@@ -273,7 +273,7 @@ const App = () => {
           filename: outFilename,
           fps: resFps,
           scale: resScale,
-          crop: { ...cropPosition, ...cropDimension },
+          crop: isCropping ? { ...cropPosition, ...cropDimension } : undefined,
           speed,
           flags: {
             boomerang: isBoomerang,
@@ -351,7 +351,7 @@ const App = () => {
     <div className="flex flex-col justify-start items-center py-2 w-screen min-h-screen">
       <div>
         <Typography size="text-3xl" weight="font-bold" align="text-center">
-          Video Clipping Tool V2.4!
+          Video Clipping Tool V2.5!
         </Typography>
       </div>
       <Typography size="text-md" align="text-center">
@@ -695,8 +695,20 @@ const App = () => {
                   <Button onClick={() => setResScale(0.25)}>25%</Button>
                   {dimension.width > 0 && (
                     <Typography>
-                      {dimension.width * resScale} x{" "}
-                      {dimension.height * resScale} px
+                      {roundToNDecimalPlaces(
+                        dimension.width *
+                          resScale *
+                          (isCropping ? cropDimension.width : 1),
+                        0
+                      )}{" "}
+                      x{" "}
+                      {roundToNDecimalPlaces(
+                        dimension.height *
+                          resScale *
+                          (isCropping ? cropDimension.height : 1),
+                        0
+                      )}{" "}
+                      px
                     </Typography>
                   )}
                 </div>
@@ -937,12 +949,16 @@ const App = () => {
               <Typography>
                 {roundToNDecimalPlaces((res?.size ?? 0) / 1000000, 2)} MB ( ~
                 {roundToNDecimalPlaces(
-                  dimension.width * resScale * cropDimension.width,
+                  dimension.width *
+                    resScale *
+                    (isCropping ? cropDimension.width : 1),
                   2
                 )}
                 x
                 {roundToNDecimalPlaces(
-                  dimension.height * resScale * cropDimension.height,
+                  dimension.height *
+                    resScale *
+                    (isCropping ? cropDimension.height : 1),
                   2
                 )}{" "}
                 px , {fps} fps)
