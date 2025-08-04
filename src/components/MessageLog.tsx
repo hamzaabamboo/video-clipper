@@ -1,14 +1,5 @@
-import { useEffect, useRef } from "react";
-
 export const MessageLog = ({ logs }: { logs: string[] }) => {
   const messageEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!messageEndRef.current) return;
-    messageEndRef.current.scrollIntoView({
-      behavior: "smooth",
-    });
-  }, [logs]);
 
   return (
     <div

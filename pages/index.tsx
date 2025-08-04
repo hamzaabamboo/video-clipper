@@ -4,7 +4,7 @@ import {
   ASPECT_RATIOS,
   Coordinate,
   Cropper,
-  Dimension,
+  Dimension
 } from "components/Cropper";
 import { MessageLog } from "components/MessageLog";
 import { Section } from "components/Section";
@@ -65,16 +65,16 @@ const App = () => {
 
   const [dimension, setDimensions] = useState<Dimension>({
     width: 0,
-    height: 0,
+    height: 0
   });
   const [cropDimension, setCropDimesion] = useState<Dimension>({
     width: 1,
-    height: 1,
+    height: 1
   });
 
   const [cropPosition, setCropPosition] = useState<Coordinate>({
     x: 0,
-    y: 0,
+    y: 0
   });
   const [aspectRatio, setAspectRatio] = useState<keyof typeof ASPECT_RATIOS>();
 
@@ -90,7 +90,8 @@ const App = () => {
   const [isCropping, setCropping] = useState<boolean>(false);
   const [isBoomerang, setBoomerang] = useState<boolean>(false);
   const [isFadeout, setFadeout] = useState<boolean>(false);
-  const [isOptimizeGif, setOptimizeGif] = useState<boolean>(true);
+  const [isOptimizeGif, setOptimizeGif] = useState<boolean | 1 | 2 | 3>(true);
+  const [gifLossy, setGifLossy] = useState<number>(60);
   const [isLooping, setLooping] = useState<boolean>(false);
 
   const [logs, setLogs] = useState<string[]>([]);
@@ -146,12 +147,12 @@ const App = () => {
       setDuration(Number(videoRef.current?.duration ?? 0));
       setDimensions({
         width: videoRef.current?.videoWidth ?? 0,
-        height: videoRef.current?.videoHeight ?? 0,
+        height: videoRef.current?.videoHeight ?? 0
       });
       setResScale(
-        (DEFAULT_WIDTH / videoRef.current?.videoWidth > 1
+        DEFAULT_WIDTH / videoRef.current?.videoWidth > 1
           ? 1
-          : DEFAULT_WIDTH / videoRef.current?.videoWidth)
+          : DEFAULT_WIDTH / videoRef.current?.videoWidth
       );
       console.log(Number(localStorage.getItem("volume")) / 100);
       videoRef.current.volume = Number(localStorage.getItem("volume")) / 100;
@@ -209,7 +210,7 @@ const App = () => {
       url: info.url,
       title: videoTitle ?? "",
       type: "youtube",
-      quality: videoQuality,
+      quality: videoQuality
     });
     setFps(info.fps);
   }, [videoRes, videoQuality, videoTitle]);
@@ -217,7 +218,7 @@ const App = () => {
   const getVidData = async () => {
     try {
       const {
-        data: { title, allFormats },
+        data: { title, allFormats }
       } = await axios.get<{ title: string; allFormats: any[] }>(
         "api/vid?" + qs.encode({ url })
       );
@@ -238,17 +239,17 @@ const App = () => {
       switch (video.type) {
         case "upload":
           setConvertProgress({
-            message: "Loading Video...",
+            message: "Loading Video..."
           });
           file = fileInputRef?.current?.files?.[0];
           if (!file) return;
           setConvertProgress({
-            message: "Loading Video...",
+            message: "Loading Video..."
           });
           break;
         default:
           setConvertProgress({
-            message: "Downloading Video...",
+            message: "Downloading Video..."
           });
           file = await downloadVideo(
             url,
@@ -257,7 +258,7 @@ const App = () => {
             setConvertProgress
           );
           setConvertProgress({
-            message: "Video Downloaded",
+            message: "Video Downloaded"
           });
           break;
       }
@@ -279,8 +280,9 @@ const App = () => {
             fadeout: isFadeout,
             loop: isLooping,
             optimizeGif: isOptimizeGif,
+            gifLossy
           },
-          metadata,
+          metadata
         },
         (progress) => setConvertProgress(progress),
         log
@@ -293,11 +295,11 @@ const App = () => {
         src: URL.createObjectURL(r.file),
         type: r.type,
         name: r.name,
-        size: r.file.size,
+        size: r.file.size
       });
     } catch (e) {
       setConvertProgress({
-        message: "Something Went Wrong... " + e,
+        message: "Something Went Wrong... " + e
       });
     }
   };
@@ -321,7 +323,7 @@ const App = () => {
       url: URL.createObjectURL(video),
       title: name.split(".").slice(undefined, -1).join(""),
       type: "upload",
-      quality: "local",
+      quality: "local"
     });
     if (!videoRef.current) return;
   };
@@ -349,7 +351,7 @@ const App = () => {
     <div className="flex flex-col justify-start items-center py-2 w-screen min-h-screen">
       <div>
         <Typography size="text-3xl" weight="font-bold" align="text-center">
-          Video Clipping Tool V2.3!
+          Video Clipping Tool V2.4!
         </Typography>
       </div>
       <Typography size="text-md" align="text-center">
@@ -408,6 +410,96 @@ const App = () => {
               </Typography>
             </div>
           </div>
+          <Section sub>
+            <div className="flex flex-col mb-2">
+              <Typography weight="font-bold" size="text-lg">
+                Progress
+              </Typography>
+              <Slider
+                step={0.01}
+                max={clip[1] ?? duration ?? 0}
+                min={clip[0] ?? 0}
+                value={roundToNDecimalPlaces(progress, 2)}
+                onChange={(e) => {
+                  updateProgress(e);
+                }}
+              />
+              <div className="flex flex-wrap items-center">
+                <Button
+                  color="bg-blue-200"
+                  onClick={() => {
+                    setClip([progress, clip[1]]);
+                  }}
+                >
+                  Set Start
+                </Button>
+                <Button
+                  color="bg-blue-200"
+                  onClick={() => {
+                    setClip([clip[0], progress]);
+                  }}
+                >
+                  Set End
+                </Button>
+                <p>({roundToNDecimalPlaces(clip[1] - clip[0], 2)} second)</p>
+              </div>
+            </div>
+            <Typography weight="font-bold" size="text-lg">
+              Trim
+            </Typography>
+            <div className="flex items-center mb-2 w-80">
+              <div className="flex-shrink">
+                <NumberField
+                  step=".01"
+                  value={roundToNDecimalPlaces(clip[0], 2)}
+                  min={0}
+                  max={clip[1]}
+                  onChange={(e) => {
+                    updateProgress(Number(e.target.value));
+                    setProgress(Number(e.target.value));
+                    setClip([Number(e.target.value), clip[1]]);
+                  }}
+                />
+              </div>
+              <div className="flex-grow px-4 w-full">
+                <RangeSlider
+                  step={0.01}
+                  min={0}
+                  max={duration}
+                  defaultValue={[0, 1]}
+                  value={clip}
+                  onRangeDragStart={() => {
+                    seekingRef.current = true;
+                    videoRef.current?.pause();
+                  }}
+                  onRangeDragEnd={() => {
+                    seekingRef.current = false;
+                    videoRef.current?.pause();
+                  }}
+                  onInput={(r) => {
+                    if (clip[0] !== r[0]) {
+                      updateProgress(r[0]);
+                    } else {
+                      updateProgress(r[1]);
+                    }
+                    setClip(r as [number, number]);
+                  }}
+                />
+              </div>
+              <div className="flex-shrink">
+                <NumberField
+                  step=".01"
+                  value={roundToNDecimalPlaces(clip[1], 2)}
+                  min={clip[0]}
+                  max={duration}
+                  onChange={(e) => {
+                    updateProgress(Number(e.target.value));
+                    setClip([clip[0], Number(e.target.value)]);
+                  }}
+                />
+              </div>
+            </div>
+          </Section>
           <div className="flex flex-col flex-grow-0 justify-center">
             <Typography align="text-center">
               {convertProgress &&
@@ -533,96 +625,7 @@ const App = () => {
                 </div>
               )}
             </Section>
-            <Section sub>
-              <div className="flex flex-col mb-2">
-                <Typography weight="font-bold" size="text-lg">
-                  Progress
-                </Typography>
-                <Slider
-                  step={0.01}
-                  max={clip[1] ?? duration ?? 0}
-                  min={clip[0] ?? 0}
-                  value={roundToNDecimalPlaces(progress, 2)}
-                  onChange={(e) => {
-                    updateProgress(e);
-                  }}
-                />
-                <div className="flex flex-wrap items-center">
-                  <Button
-                    color="bg-blue-200"
-                    onClick={() => {
-                      setClip([progress, clip[1]]);
-                    }}
-                  >
-                    Set Start
-                  </Button>
-                  <Button
-                    color="bg-blue-200"
-                    onClick={() => {
-                      setClip([clip[0], progress]);
-                    }}
-                  >
-                    Set End
-                  </Button>
-                  <p>({roundToNDecimalPlaces(clip[1] - clip[0], 2)} second)</p>
-                </div>
-              </div>
-              <Typography weight="font-bold" size="text-lg">
-                Trim
-              </Typography>
-              <div className="flex items-center mb-2 w-80">
-                <div className="flex-shrink">
-                  <NumberField
-                    step=".01"
-                    value={roundToNDecimalPlaces(clip[0], 2)}
-                    min={0}
-                    max={clip[1]}
-                    onChange={(e) => {
-                      updateProgress(Number(e.target.value));
-                      setProgress(Number(e.target.value));
-                      setClip([Number(e.target.value), clip[1]]);
-                    }}
-                  />
-                </div>
-                <div className="flex-grow px-4 w-full">
-                  <RangeSlider
-                    step={0.01}
-                    min={0}
-                    max={duration}
-                    defaultValue={[0, 1]}
-                    value={clip}
-                    onRangeDragStart={() => {
-                      seekingRef.current = true;
-                      videoRef.current?.pause();
-                    }}
-                    onRangeDragEnd={() => {
-                      seekingRef.current = false;
-                      videoRef.current?.pause();
-                    }}
-                    onInput={(r) => {
-                      if (clip[0] !== r[0]) {
-                        updateProgress(r[0]);
-                      } else {
-                        updateProgress(r[1]);
-                      }
-                      setClip(r as [number, number]);
-                    }}
-                  />
-                </div>
-                <div className="flex-shrink">
-                  <NumberField
-                    step=".01"
-                    value={roundToNDecimalPlaces(clip[1], 2)}
-                    min={clip[0]}
-                    max={duration}
-                    onChange={(e) => {
-                      updateProgress(Number(e.target.value));
-                      setClip([clip[0], Number(e.target.value)]);
-                    }}
-                  />
-                </div>
-              </div>
-            </Section>
+
             <Section sub>
               <Button
                 color="bg-blue-500"
@@ -752,7 +755,7 @@ const App = () => {
                         onChange={(e) =>
                           setMetadata({
                             ...metadata,
-                            albumArt: e.target.files?.[0],
+                            albumArt: e.target.files?.[0]
                           })
                         }
                       />
@@ -840,10 +843,52 @@ const App = () => {
                   type="checkbox"
                   className="w-4 h-4"
                   disabled={outType !== "gif"}
-                  checked={isOptimizeGif}
+                  checked={!!isOptimizeGif}
                   onChange={(e) => setOptimizeGif(e.target.checked)}
                 />
               </div>
+              {isOptimizeGif && outType === "gif" && (
+                <Section sub>
+                  <Typography size="text-md" margin="mr-2">
+                    Optimization Level
+                  </Typography>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="optimize-level"
+                      value={1}
+                      checked={isOptimizeGif === 1}
+                      onChange={() => setOptimizeGif(1)}
+                    />
+                    <label>O1</label>
+                    <input
+                      type="radio"
+                      name="optimize-level"
+                      value={2}
+                      checked={isOptimizeGif === 2 || isOptimizeGif === true}
+                      onChange={() => setOptimizeGif(2)}
+                    />
+                    <label>O2</label>
+                    <input
+                      type="radio"
+                      name="optimize-level"
+                      value={3}
+                      checked={isOptimizeGif === 3}
+                      onChange={() => setOptimizeGif(3)}
+                    />
+                    <label>O3</label>
+                  </div>
+                  <Typography size="text-md" margin="mr-2">
+                    Lossiness
+                  </Typography>
+                  <Slider
+                    min={1}
+                    max={200}
+                    value={gifLossy}
+                    onChange={(e) => setGifLossy(e)}
+                  />
+                </Section>
+              )}
             </Section>
             <Section sub>
               <Typography weight="font-bold" size="text-lg" type="h3">

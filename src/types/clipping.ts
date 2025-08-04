@@ -32,5 +32,6 @@ export interface Flags {
   boomerang?: boolean;
   fadeout?: boolean;
   loop?: boolean;
-  optimizeGif?: boolean;
+  optimizeGif?: boolean | 1 | 2 | 3;
+  gifLossy?: number;
 }

@@ -39,7 +39,7 @@ export const clipStream = async (
   const { fps, scale, crop, speed, flags, filename, metadata } = options;
   const { start, end } = duration;
   const { x, y, width, height } = crop;
-  const { boomerang, optimizeGif } = flags;
+  const { boomerang, optimizeGif, gifLossy } = flags;
 
   const dur = Number(end) - Number(start);
   if (type === "gif" && dur > 60) {
@@ -141,7 +141,10 @@ export const clipStream = async (
       });
       const files = await gifsicle.run({
         input: [{ file, name: "input.gif" }],
-        command: [`-O2 --lossy=60 input.gif -o /out/${outname}`]
+        command: [
+          `-O${optimizeGif === true ? 2 : optimizeGif} --lossy=${gifLossy ??
+            60} input.gif -o /out/${outname}`
+        ]
       });
       file = files[0];
     }

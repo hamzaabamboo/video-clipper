@@ -203,6 +203,124 @@ export const Cropper = forwardRef<
       };
     };
 
+  const handleTouchDrag =
+    (type: "pos" | "size" | "all") =>
+    (event: React.TouchEvent<HTMLDivElement>) => {
+      const target = event.nativeEvent.target as HTMLDivElement;
+      let shiftX =
+        event.nativeEvent.touches[0].clientX -
+        target.getBoundingClientRect().left;
+      let shiftY =
+        event.nativeEvent.touches[0].clientY - target.getBoundingClientRect().top;
+      event.nativeEvent.stopPropagation();
+
+      if (!parentRef.current) return;
+      const t = parentRef.current as HTMLDivElement;
+
+      const rect = t.getBoundingClientRect();
+
+      function onMouseMove(event: TouchEvent) {
+        if (type === "pos") {
+          const x2 =
+            cropPositionRef.current.x +
+            rect.left * cropDimensionRef.current.width;
+          const y2 =
+            cropPositionRef.current.y +
+            rect.top * cropDimensionRef.current.height;
+          const xOff = event.touches[0].clientX - shiftX - rect.left;
+          const yOff = event.touches[0].clientY - shiftY - rect.top;
+
+          const cropper = cropperRef.current as HTMLDivElement;
+
+          const xDim = (x2 - xOff) / rect.width;
+          const yDim = (y2 - yOff) / rect.height;
+
+          if (yOff > 0 && yOff < y2) {
+            cropDimensionRef.current.height = yDim / rect.height;
+            cropper.style.height = yDim * 100 + "%";
+            cropPositionRef.current.y = yOff / rect.height;
+            cropper.style.top = yOff + "px";
+          }
+          if (xOff > 0 && xOff < x2) {
+            cropDimensionRef.current.width = xDim / rect.width;
+            cropper.style.width = xDim * 100 + "%";
+            cropPositionRef.current.x = xOff / rect.height;
+            cropper.style.left = xOff + "px";
+          }
+        }
+        if (type === "all") {
+          const xOff = event.touches[0].clientX - shiftX - rect.left;
+          const yOff = event.touches[0].clientY - shiftY - rect.top;
+          const cropper = cropperRef.current as HTMLDivElement;
+          if (
+            yOff > 0 &&
+            yOff + cropDimensionRef.current.height * rect.height < rect.height
+          ) {
+            cropPositionRef.current.y = yOff / rect.height;
+            cropper.style.top = yOff + "px";
+          }
+          if (
+            xOff > 0 &&
+            xOff + cropDimensionRef.current.width * rect.width < rect.width
+          ) {
+            cropPositionRef.current.x = xOff / rect.width;
+            cropper.style.left = xOff + "px";
+          }
+        }
+        if (type === "size") {
+          const xOff =
+            event.touches[0].clientX -
+            rect.left -
+            cropPositionRef.current.x * rect.width;
+
+          const yOff =
+            event.touches[0].clientY -
+            rect.top -
+            cropPositionRef.current.y * rect.height;
+          const cropper = cropperRef.current as HTMLDivElement;
+          if (aspectRatio && aspectRatio in ASPECT_RATIOS) {
+            const mag = Math.max(xOff, yOff);
+
+            const factor =
+              ASPECT_RATIOS[aspectRatio][1] / ASPECT_RATIOS[aspectRatio][0];
+            const newHeight = mag / rect.height;
+            const newWidth = mag / rect.width;
+            if (
+              newHeight + cropPositionRef.current.y > 1 ||
+              newWidth + cropPositionRef.current.x > 1
+            )
+              return;
+            cropDimensionRef.current.height = newHeight * factor;
+            cropper.style.height = newHeight * factor * 100 + "%";
+            cropDimensionRef.current.width = newWidth;
+            cropper.style.width = newWidth * 100 + "%";
+          } else {
+            const xDim = xOff / rect.width;
+            const yDim = yOff / rect.height;
+
+            if (yOff > 0 && yOff < rect.height) {
+              cropDimensionRef.current.height = yDim;
+              cropper.style.height = yDim * 100 + "%";
+            }
+            if (xOff > 0 && xOff < rect.width) {
+              cropDimensionRef.current.width = xDim;
+              cropper.style.width = xDim * 100 + "%";
+            }
+          }
+        }
+      }
+
+      // move the ball on mousemove
+      window.addEventListener("touchmove", onMouseMove);
+
+      target.ontouchend = function () {
+        console.log("upp!!!");
+        window.removeEventListener("touchmove", onMouseMove);
+        target.ontouchend = null;
+        updateCrop();
+      };
+    };
+
   useEffect(() => {
     if (!aspectRatio || !(aspectRatio in ASPECT_RATIOS)) return;
     const t = parentRef.current as HTMLDivElement;
@@ -237,6 +355,7 @@ export const Cropper = forwardRef<
           className="z-30 bg-gray-500 opacity-25 border border-black w-full h-full"
           draggable
           onMouseDown={handleDrag("all")}
+          onTouchStart={handleTouchDrag("all")}
           onDragStart={() => {
             return false;
           }}
@@ -246,6 +365,7 @@ export const Cropper = forwardRef<
           style={{ top: "-1rem", left: "-1rem" }}
           draggable
           onMouseDown={handleDrag("pos")}
+          onTouchStart={handleTouchDrag("pos")}
           onDragStart={() => {
             return false;
           }}
@@ -255,6 +375,7 @@ export const Cropper = forwardRef<
           style={{ bottom: "-1rem", right: "-1rem" }}
           draggable
           onMouseDown={handleDrag("size")}
+          onTouchStart={handleTouchDrag("size")}
           onDragStart={() => {
             return false;
           }}
