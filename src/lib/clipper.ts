@@ -37,9 +37,9 @@ export const clipStream = async (
   onLog?: (message: string) => void
 ): Promise<{ file: Blob; type: string; name: string }> => {
   const { fps, scale, crop, speed, flags, filename, metadata } = options;
-  const { start, end } = duration;
-  const { x, y, width, height } = crop;
-  const { boomerang, optimizeGif, gifLossy } = flags;
+  const { start, end } = duration ?? {};
+  const { x, y, width, height } = crop ?? {};
+  const { boomerang, optimizeGif, gifLossy } = flags ?? {};
 
   const dur = Number(end) - Number(start);
   if (type === "gif" && dur > 60) {
@@ -142,8 +142,9 @@ export const clipStream = async (
       const files = await gifsicle.run({
         input: [{ file, name: "input.gif" }],
         command: [
-          `-O${optimizeGif === true ? 2 : optimizeGif} --lossy=${gifLossy ??
-            60} input.gif -o /out/${outname}`
+          `-O${optimizeGif === true ? 2 : optimizeGif} --lossy=${
+            gifLossy ?? 60
+          } input.gif -o /out/${outname}`
         ]
       });
       file = files[0];
@@ -171,7 +172,7 @@ const getArgs = (
 ) => {
   const { fps, scale, crop, speed, flags } = options;
   const { start, end } = duration;
-  const { x, y, width, height } = crop;
+  const { x, y, width, height } = crop ?? {};
   const { boomerang, fadeout, loop } = flags;
   const { type: outType } = MEDIA_TYPES[type];
   const args: string[] = [];
