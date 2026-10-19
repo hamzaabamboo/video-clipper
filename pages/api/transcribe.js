@@ -20,9 +20,9 @@ export default async function handler(req, res) {
     res.status(405).json({ error: 'Gunakan POST' });
     return;
   }
-  const key = process.env.GROQ_API_KEY;
+  const key = String(req.headers['x-groq-key'] || process.env.GROQ_API_KEY || '').trim();
   if (!key) {
-    res.status(500).json({ error: 'GROQ_API_KEY belum diisi di Environment Variables Vercel' });
+    res.status(500).json({ error: 'API Key Groq belum diisi. Isi di kolom API Key pada halaman, lalu Simpan.' });
     return;
   }
 

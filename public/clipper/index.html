@@ -36,6 +36,7 @@ input[type=range]{width:100%;accent-color:var(--ac)}
 .clip b{display:block;font-size:14px}
 .clip small{color:var(--mut)}
 .score{color:var(--ac);font-weight:700}
+input[type=password],input[type=text].k{width:100%;background:#0f1115;color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:9px 10px;font:inherit}
 .hint{font-size:12px;color:var(--mut);margin-top:6px}
 video.out{width:100%;max-width:300px;border-radius:12px;margin-top:10px;display:block}
 a.dl{display:inline-block;margin-top:10px;padding:10px 14px;background:var(--ok);color:#06251a;border-radius:10px;font-weight:700;text-decoration:none}
@@ -43,6 +44,17 @@ a.dl{display:inline-block;margin-top:10px;padding:10px 14px;background:var(--ok)
 </head>
 <body>
 <h1>Pono <span>Clipper</span></h1>
+
+<div class="card">
+  <h2>API Key Groq</h2>
+  <input id="key" type="password" class="k" placeholder="gsk_..." autocomplete="off" autocapitalize="off" spellcheck="false">
+  <div class="row" style="margin-top:8px">
+    <button class="sm pri" id="btnKeySave">Simpan</button>
+    <button class="sm" id="btnKeyShow">Lihat</button>
+    <button class="sm" id="btnKeyDel">Hapus</button>
+  </div>
+  <div id="keyStatus" class="hint">Buat key gratis di console.groq.com. Key tersimpan hanya di browser HP ini dan dikirim lewat server Vercel kamu ke Groq, tidak disimpan di server.</div>
+</div>
 
 <div class="card">
   <h2>1 · Video</h2>
@@ -128,6 +140,11 @@ const ease = x => { x = clamp(x,0,1); return x*x*(3-2*x); };
 const fmt = s => { s = Math.max(0, Math.round(s)); return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0'); };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const wordKey = w => w.replace(/[^\p{L}\p{N}]/gu, '');
+
+const KEY_NAME = 'pono_groq_key';
+function getKey(){ try { return (localStorage.getItem(KEY_NAME) || '').trim(); } catch(e){ return (window.__k || '').trim(); } }
+function putKey(v){ window.__k = v; try { if (v) localStorage.setItem(KEY_NAME, v); else localStorage.removeItem(KEY_NAME); } catch(e){} }
+function keyMsg(m, ok){ const el = $('#keyStatus'); el.textContent = m; el.style.color = ok ? 'var(--ok)' : 'var(--mut)'; }
 
 function setStatus(msg, cls){ const el = $('#status'); el.textContent = msg; el.className = cls || ''; }
 function setBar(p){ $('#bar').style.width = Math.round(clamp(p,0,1)*100) + '%'; }
@@ -389,6 +406,7 @@ function chunkWav(ab, i){
   return { blob:new Blob([head, pcm.buffer], { type:'audio/wav' }), rms };
 }
 async function api(path, opts, label){
+  opts.headers = Object.assign({}, opts.headers, { 'x-groq-key': getKey() });
   for (let attempt = 0; attempt < 5; attempt++) {
     let r, data;
     try {
@@ -411,6 +429,7 @@ async function api(path, opts, label){
 async function runAuto(){
   const file = $('#file').files[0];
   if (!file) { setStatus('Pilih video dulu.', 'err'); return; }
+  if (!getKey()) { setStatus('Isi API Key Groq dulu di kolom paling atas, lalu tekan Simpan.', 'err'); return; }
   const btn = $('#btnAuto'); btn.disabled = true;
   $('#clips').innerHTML = '';
   setBar(0);
@@ -523,6 +542,18 @@ $('#btnSample').onclick = () => {
 $('#btnPlay').onclick = play;
 $('#btnRec').onclick = startRec;
 $('#btnAuto').onclick = runAuto;
+$('#btnKeySave').onclick = () => {
+  const v = $('#key').value.trim();
+  if (!v) { keyMsg('Kolom masih kosong.'); return; }
+  putKey(v);
+  keyMsg(v.startsWith('gsk_') ? 'Key tersimpan di HP ini.' : 'Tersimpan, tapi key Groq biasanya diawali gsk_. Pastikan sudah benar.', v.startsWith('gsk_'));
+};
+$('#btnKeyShow').onclick = () => {
+  const el = $('#key'); const show = el.type === 'password';
+  el.type = show ? 'text' : 'password'; $('#btnKeyShow').textContent = show ? 'Sembunyi' : 'Lihat';
+};
+$('#btnKeyDel').onclick = () => { putKey(''); $('#key').value = ''; keyMsg('Key dihapus dari HP ini.'); };
+if (getKey()) { $('#key').value = getKey(); keyMsg('Key tersimpan di HP ini.', true); }
 
 requestAnimationFrame(loop);
 })();
