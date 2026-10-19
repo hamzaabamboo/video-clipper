@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pono Clipper</title>
+<style>
+:root{--bg:#0e0f12;--card:#17191f;--line:#262a33;--tx:#eceef2;--mut:#8b93a3;--ac:#ffcf3a;--ok:#3ddc97;--err:#ff6b6b}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{padding:14px 14px calc(40px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto}
+h1{font-size:18px;margin:2px 0 12px;letter-spacing:.2px}
+h1 span{color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+.card h2{font-size:13px;margin:0 0 10px;color:var(--mut);text-transform:uppercase;letter-spacing:.8px;font-weight:600}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+label{font-size:12px;color:var(--mut);display:block;margin-bottom:3px}
+input[type=number],select,textarea{width:100%;background:#0f1115;color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:9px 10px;font:inherit}
+textarea{min-height:76px;resize:vertical}
+button{background:#232733;color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-weight:600}
+button.pri{background:var(--ac);color:#1a1500;border-color:var(--ac)}
+button.sm{padding:7px 9px;font-size:12px}
+button:disabled{opacity:.45}
+.stage{display:flex;justify-content:center;margin-bottom:10px}
+canvas{width:100%;max-width:300px;aspect-ratio:9/16;border-radius:14px;background:#000;border:1px solid var(--line)}
+#vid{position:fixed;width:2px;height:2px;opacity:.01;pointer-events:none;left:0;top:0}
+.chk{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px}
+.chk label{display:flex;align-items:center;gap:6px;color:var(--tx);margin:0;font-size:13px}
+input[type=range]{width:100%;accent-color:var(--ac)}
+.bar{height:6px;background:#0f1115;border-radius:6px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;width:0;background:var(--ac);transition:width .2s}
+#status{font-size:13px;color:var(--mut);margin-top:8px;min-height:18px;white-space:pre-wrap}
+#status.err{color:var(--err)} #status.ok{color:var(--ok)}
+.clip{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px;border:1px solid var(--line);border-radius:10px;margin-top:8px;background:#12141a}
+.clip b{display:block;font-size:14px}
+.clip small{color:var(--mut)}
+.score{color:var(--ac);font-weight:700}
+.hint{font-size:12px;color:var(--mut);margin-top:6px}
+video.out{width:100%;max-width:300px;border-radius:12px;margin-top:10px;display:block}
+a.dl{display:inline-block;margin-top:10px;padding:10px 14px;background:var(--ok);color:#06251a;border-radius:10px;font-weight:700;text-decoration:none}
+</style>
+</head>
+<body>
+<h1>Pono <span>Clipper</span></h1>
+
+<div class="card">
+  <h2>1 · Video</h2>
+  <input id="file" type="file" accept="video/*">
+  <div class="hint">Semua proses video di HP. Hanya potongan audio yang dikirim ke Groq lewat server Vercel kamu.</div>
+</div>
+
+<div class="card">
+  <h2>Pratinjau 9:16</h2>
+  <div class="stage"><canvas id="cv" width="540" height="960"></canvas></div>
+  <div class="row">
+    <button id="btnPlay" class="pri">Putar klip</button>
+    <button id="btnRec">Rekam klip</button>
+  </div>
+  <div id="recStatus" class="hint"></div>
+  <div id="outBox"></div>
+</div>
+
+<div class="card">
+  <h2>2 · Auto (transkrip + pilih momen)</h2>
+  <div class="grid2">
+    <div><label>Bahasa video</label>
+      <select id="lang">
+        <option value="auto">Otomatis</option>
+        <option value="id">Indonesia</option>
+        <option value="en">Inggris</option>
+        <option value="zh">Mandarin</option>
+      </select></div>
+    <div style="display:flex;align-items:flex-end"><button id="btnAuto" class="pri" style="width:100%">Auto</button></div>
+  </div>
+  <div class="bar"><i id="bar"></i></div>
+  <div id="status"></div>
+  <div id="clips"></div>
+  <div class="hint">Auto cocok untuk video sampai ±20 menit. Kalau HP kehabisan memori, atur klip manual di bawah.</div>
+</div>
+
+<div class="card">
+  <h2>3 · Potong manual</h2>
+  <div class="grid2">
+    <div><label>Mulai (detik)</label><input id="tStart" type="number" step="0.1" min="0" value="0" inputmode="decimal"></div>
+    <div><label>Selesai (detik)</label><input id="tEnd" type="number" step="0.1" min="0" value="30" inputmode="decimal"></div>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button class="sm" id="btnSetStart">Mulai = posisi ini</button>
+    <button class="sm" id="btnSetEnd">Selesai = posisi ini</button>
+  </div>
+  <div style="margin-top:12px"><label>Geser crop kiri–kanan</label><input id="pan" type="range" min="0" max="1" step="0.01" value="0.5"></div>
+  <div style="margin-top:8px"><label>Mode frame</label>
+    <select id="mode"><option value="crop">Crop penuh 9:16</option><option value="blur">Utuh + latar blur</option></select></div>
+</div>
+
+<div class="card">
+  <h2>4 · Teks &amp; efek</h2>
+  <label>Teks (tulis KATA KUNCI dengan huruf kapital)</label>
+  <textarea id="txt" placeholder="kita harus BERUBAH sekarang"></textarea>
+  <div class="row" style="margin-top:8px">
+    <button class="sm" id="btnSample">Isi teks contoh</button>
+  </div>
+  <div class="chk" style="margin-top:12px">
+    <label><input type="checkbox" id="fxZoom" checked> Zoom bergantian</label>
+    <label><input type="checkbox" id="fxFrame" checked> Bingkai + vignette</label>
+    <label><input type="checkbox" id="fxWarm" checked> Nuansa hangat</label>
+    <label><input type="checkbox" id="fxBar" checked> Bar progres</label>
+    <label><input type="checkbox" id="fxFade" checked> Fade awal/akhir</label>
+  </div>
+</div>
+
+<video id="vid" playsinline preload="auto"></video>
+
+<script>
+(function(){
+const $ = s => document.querySelector(s);
+const W = 540, H = 960, CH = 90, ACC = '#ffcf3a';
+const cv = $('#cv'), cx = cv.getContext('2d');
+const vid = $('#vid');
+
+const S = { start:0, end:30, pan:.5, mode:'crop', words:[], groups:[], auto:false, tr:null, keys:new Set(), warm:0 };
+let rec = null, actx = null, gain = null, adest = null, srcNode = null;
+
+const fx = () => ({ zoom:$('#fxZoom').checked, frame:$('#fxFrame').checked, warm:$('#fxWarm').checked, bar:$('#fxBar').checked, fade:$('#fxFade').checked });
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const ease = x => { x = clamp(x,0,1); return x*x*(3-2*x); };
+const fmt = s => { s = Math.max(0, Math.round(s)); return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0'); };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const wordKey = w => w.replace(/[^\p{L}\p{N}]/gu, '');
+
+function setStatus(msg, cls){ const el = $('#status'); el.textContent = msg; el.className = cls || ''; }
+function setBar(p){ $('#bar').style.width = Math.round(clamp(p,0,1)*100) + '%'; }
+
+/* ---------- teks & kata ---------- */
+function isCapsKey(w){
+  const k = wordKey(w);
+  return k.length > 1 && k === k.toUpperCase() && k !== k.toLowerCase();
+}
+function buildManualWords(){
+  const parts = $('#txt').value.split(/\s+/).filter(Boolean);
+  const dur = Math.max(.5, S.end - S.start);
+  const weights = parts.map(p => p.length + 2);
+  const total = weights.reduce((a,b) => a+b, 0) || 1;
+  let t = S.start;
+  return parts.map((p,i) => {
+    const d = dur * weights[i] / total;
+    const o = { w:p, s:t, e:t+d, key:isCapsKey(p) };
+    t += d;
+    return o;
+  });
+}
+function buildAutoWords(){
+  if (!S.tr) return [];
+  return S.tr.words
+    .filter(x => x.s >= S.start - .15 && x.s < S.end)
+    .map(x => ({ w:x.w, s:x.s, e:x.e, key:S.keys.has(wordKey(x.w).toLowerCase()) }));
+}
+function buildGroups(words){
+  const g = [];
+  for (let i = 0; i < words.length; i += 3) {
+    const ws = words.slice(i, i+3);
+    g.push({ s:ws[0].s, ws, hasKey:ws.some(x => x.key) });
+  }
+  g.forEach((x,i) => { x.n = i < g.length-1 ? g[i+1].s : x.ws[x.ws.length-1].e + .5; });
+  return g;
+}
+function refreshWords(){
+  S.words = S.auto ? buildAutoWords() : buildManualWords();
+  S.groups = buildGroups(S.words);
+}
+function fillTextFromWords(){
+  $('#txt').value = S.words.map(x => x.key ? x.w.toUpperCase() : x.w).join(' ');
+}
+
+/* ---------- render ---------- */
+function drawText(t){
+  const g = S.groups.find(x => t >= x.s && t < x.n);
+  if (!g) return {key:false, age:0};
+  const age = t - g.s, a = ease(age / .15), pop = .88 + .12 * a;
+  const lines = g.ws.map(w => ({ t: w.key ? w.w.toUpperCase() : w.w, key: w.key }));
+  const sizes = lines.map(l => l.key ? 88 : 40);
+  const total = sizes.reduce((s,v) => s + v*1.12, 0);
+  const ax = W - 34;
+  cx.save();
+  cx.translate(ax, H*.56);
+  cx.scale(pop, pop);
+  cx.globalAlpha = a;
+  cx.textAlign = 'right';
+  cx.textBaseline = 'alphabetic';
+  let y = -total/2;
+  lines.forEach((l,i) => {
+    let sz = sizes[i];
+    const fam = 'system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
+    cx.font = (l.key ? 'italic 900 ' : '300 ') + sz + 'px ' + fam;
+    const mw = cx.measureText(l.t).width, maxw = W - 70;
+    if (mw > maxw) { sz = sz * maxw / mw; cx.font = (l.key ? 'italic 900 ' : '300 ') + sz + 'px ' + fam; }
+    y += sz * 1.0;
+    cx.shadowColor = 'rgba(0,0,0,.65)'; cx.shadowBlur = l.key ? 16 : 8; cx.shadowOffsetY = 4;
+    cx.fillStyle = l.key ? ACC : '#ffffff';
+    cx.fillText(l.t, 0, y);
+    y += sz * .12;
+  });
+  cx.restore();
+  return { key:g.hasKey, age };
+}
+
+function drawVideo(zoom){
+  const vw = vid.videoWidth, vh = vid.videoHeight;
+  if (!vw || vid.readyState < 2) return;
+  cx.save();
+  cx.translate(W/2, H/2); cx.scale(zoom, zoom); cx.translate(-W/2, -H/2);
+  if (S.mode === 'blur') {
+    const sc = Math.max(W/vw, H/vh), dw = vw*sc, dh = vh*sc;
+    cx.save();
+    try { cx.filter = 'blur(26px) brightness(.55)'; } catch(e){}
+    cx.drawImage(vid, (W-dw)/2 - 30, (H-dh)/2 - 30, dw + 60, dh + 60);
+    cx.restore();
+    const fs = W / vw, fw = W, fh = vh * fs;
+    cx.drawImage(vid, 0, (H-fh)/2, fw, fh);
+  } else {
+    const sc = Math.max(W/vw, H/vh), dw = vw*sc, dh = vh*sc;
+    const slack = dw - W;
+    cx.drawImage(vid, -slack * S.pan, (H-dh)/2, dw, dh);
+  }
+  cx.restore();
+}
+
+function render(){
+  const f = fx();
+  const t = vid.currentTime || 0;
+  const rel = Math.max(0, t - S.start), dur = Math.max(.1, S.end - S.start);
+  cx.setTransform(1,0,0,1,0,0);
+  cx.globalAlpha = 1; cx.shadowColor = 'transparent';
+  cx.fillStyle = '#050608'; cx.fillRect(0,0,W,H);
+
+  const zoom = f.zoom ? 1 + .18 * ease(.5 - .5*Math.cos(rel / 3.5 * Math.PI)) : 1;
+
+  cx.save();
+  if (f.frame) {
+    const i = 16, r = 40;
+    cx.beginPath();
+    if (cx.roundRect) cx.roundRect(i, i, W-2*i, H-2*i, r); else cx.rect(i, i, W-2*i, H-2*i);
+    cx.clip();
+  }
+  drawVideo(zoom);
+
+  const tx = S.groups.find(x => t >= x.s && t < x.n);
+  const target = (f.warm && tx && tx.hasKey) ? 1 : 0;
+  S.warm += (target - S.warm) * .12;
+  if (S.warm > .01) { cx.fillStyle = 'rgba(255,140,40,' + (.16 * S.warm).toFixed(3) + ')'; cx.fillRect(0,0,W,H); }
+
+  if (f.frame) {
+    const gr = cx.createRadialGradient(W/2, H/2, H*.28, W/2, H/2, H*.62);
+    gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,.55)');
+    cx.fillStyle = gr; cx.fillRect(0,0,W,H);
+  }
+  cx.restore();
+
+  drawText(t);
+
+  if (f.bar) {
+    const p = clamp(rel / dur, 0, 1);
+    cx.fillStyle = 'rgba(255,255,255,.2)'; cx.fillRect(40, H-30, W-80, 4);
+    cx.fillStyle = ACC; cx.fillRect(40, H-30, (W-80)*p, 4);
+  }
+  if (f.fade) {
+    const a = clamp(Math.min(rel / .3, (S.end - t) / .3), 0, 1);
+    if (a < 1) { cx.fillStyle = 'rgba(0,0,0,' + (1-a).toFixed(3) + ')'; cx.fillRect(0,0,W,H); }
+  }
+}
+
+function loop(){
+  if (!vid.paused && vid.currentTime >= S.end) {
+    vid.pause();
+    if (rec) finishRec();
+    $('#btnPlay').textContent = 'Putar klip';
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+
+/* ---------- audio graph ---------- */
+function ensureAudio(){
+  if (actx) return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    actx = new AC();
+    srcNode = actx.createMediaElementSource(vid);
+    gain = actx.createGain();
+    adest = actx.createMediaStreamDestination();
+    srcNode.connect(gain); gain.connect(actx.destination);
+    srcNode.connect(adest);
+  } catch(e) { actx = null; adest = null; gain = null; }
+}
+
+/* ---------- putar & rekam ---------- */
+async function play(){
+  if (!vid.src) return;
+  ensureAudio();
+  if (actx && actx.state === 'suspended') await actx.resume();
+  if (vid.paused) {
+    if (vid.currentTime < S.start || vid.currentTime >= S.end - .05) vid.currentTime = S.start;
+    await vid.play();
+    $('#btnPlay').textContent = 'Jeda';
+  } else {
+    vid.pause();
+    $('#btnPlay').textContent = 'Putar klip';
+  }
+}
+function waitSeek(){ return new Promise(r => { const h = () => { vid.removeEventListener('seeked', h); r(); }; vid.addEventListener('seeked', h); }); }
+
+async function startRec(){
+  if (!vid.src || rec) return;
+  if (!window.MediaRecorder || !cv.captureStream) { $('#recStatus').textContent = 'Browser ini belum mendukung perekaman. Pakai Chrome di Android.'; return; }
+  ensureAudio();
+  if (actx && actx.state === 'suspended') await actx.resume();
+  vid.pause();
+  vid.currentTime = S.start;
+  await waitSeek();
+  const stream = cv.captureStream(30);
+  if (adest) adest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr));
+  if (gain) gain.gain.value = 0;
+  const types = ['video/mp4;codecs=avc1,mp4a.40.2', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  const mime = types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+  const chunks = [];
+  let mr;
+  try { mr = new MediaRecorder(stream, mime ? { mimeType:mime, videoBitsPerSecond:5000000 } : {}); }
+  catch(e){ $('#recStatus').textContent = 'Gagal memulai rekaman: ' + e.message; if (gain) gain.gain.value = 1; return; }
+  mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  mr.onstop = () => {
+    if (gain) gain.gain.value = 1;
+    const type = mr.mimeType || mime || 'video/webm';
+    const blob = new Blob(chunks, { type });
+    const ext = type.includes('mp4') ? 'mp4' : 'webm';
+    const url = URL.createObjectURL(blob);
+    const box = $('#outBox');
+    box.innerHTML = '';
+    const v = document.createElement('video');
+    v.src = url; v.controls = true; v.playsInline = true; v.className = 'out';
+    const a = document.createElement('a');
+    a.href = url; a.download = 'klip-' + Date.now() + '.' + ext; a.textContent = 'Unduh klip (' + ext + ')'; a.className = 'dl';
+    box.appendChild(v); box.appendChild(a);
+    $('#recStatus').textContent = 'Selesai. Kalau tombol unduh tidak jalan, tekan lama videonya lalu simpan.';
+    $('#btnRec').disabled = false; $('#btnRec').textContent = 'Rekam klip';
+    rec = null;
+  };
+  rec = mr;
+  $('#btnRec').disabled = true; $('#btnRec').textContent = 'Merekam…';
+  $('#recStatus').textContent = 'Merekam real-time, jangan tutup halaman. Durasi ' + (S.end - S.start).toFixed(1) + ' detik.';
+  mr.start(250);
+  await vid.play();
+  $('#btnPlay').textContent = 'Jeda';
+}
+function finishRec(){ if (rec && rec.state !== 'inactive') rec.stop(); }
+
+/* ---------- Auto: transkrip + momen ---------- */
+async function decodeAudio(file){
+  const buf = await file.arrayBuffer();
+  const AC = window.AudioContext || window.webkitAudioContext;
+  let c;
+  try { c = new AC({ sampleRate:16000 }); } catch(e) { c = new AC(); }
+  const ab = await c.decodeAudioData(buf);
+  try { c.close(); } catch(e){}
+  return ab;
+}
+function chunkWav(ab, i){
+  const sr = ab.sampleRate, n = ab.numberOfChannels;
+  const s0 = Math.floor(i * CH * sr), s1 = Math.min(ab.length, Math.floor((i+1) * CH * sr));
+  const len = s1 - s0;
+  const mono = new Float32Array(len);
+  for (let c = 0; c < n; c++) { const d = ab.getChannelData(c); for (let j = 0; j < len; j++) mono[j] += d[s0 + j] / n; }
+  const outLen = Math.floor(len * 16000 / sr);
+  const pcm = new Int16Array(outLen);
+  let sum = 0;
+  for (let k = 0; k < outLen; k++) {
+    const pos = k * sr / 16000, i0 = Math.floor(pos), fr = pos - i0;
+    const v = mono[i0] * (1 - fr) + mono[Math.min(i0 + 1, len - 1)] * fr;
+    sum += v * v;
+    pcm[k] = Math.round(clamp(v, -1, 1) * 32767);
+  }
+  const rms = Math.sqrt(sum / Math.max(1, outLen));
+  const head = new ArrayBuffer(44), dv = new DataView(head);
+  const wr = (o, s) => { for (let q = 0; q < s.length; q++) dv.setUint8(o + q, s.charCodeAt(q)); };
+  wr(0, 'RIFF'); dv.setUint32(4, 36 + pcm.length * 2, true); wr(8, 'WAVE'); wr(12, 'fmt ');
+  dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, 16000, true); dv.setUint32(28, 32000, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  wr(36, 'data'); dv.setUint32(40, pcm.length * 2, true);
+  return { blob:new Blob([head, pcm.buffer], { type:'audio/wav' }), rms };
+}
+async function api(path, opts, label){
+  for (let attempt = 0; attempt < 5; attempt++) {
+    let r, data;
+    try {
+      r = await fetch(path, opts);
+      const txt = await r.text();
+      try { data = JSON.parse(txt); } catch(e) { data = null; }
+      if (!data) throw new Error('Route /api belum aktif. Deploy ke Vercel dulu (jangan buka file langsung).');
+    } catch(e) { throw e; }
+    if (r.ok) return data;
+    if (r.status === 429) {
+      const wait = Math.max(8, data.retryAfter || 20);
+      for (let s = wait; s > 0; s--) { setStatus(label + '\nBatas Groq tercapai, tunggu ' + s + ' dtk…'); await sleep(1000); }
+      continue;
+    }
+    throw new Error(data.error || ('Error ' + r.status));
+  }
+  throw new Error('Gagal setelah beberapa percobaan (limit Groq).');
+}
+
+async function runAuto(){
+  const file = $('#file').files[0];
+  if (!file) { setStatus('Pilih video dulu.', 'err'); return; }
+  const btn = $('#btnAuto'); btn.disabled = true;
+  $('#clips').innerHTML = '';
+  setBar(0);
+  try {
+    setStatus('Membaca audio dari video…');
+    const ab = await decodeAudio(file);
+    const nChunks = Math.ceil(ab.duration / CH);
+    const words = [];
+    const lang = $('#lang').value;
+    for (let i = 0; i < nChunks; i++) {
+      const label = 'Transkrip ' + (i+1) + '/' + nChunks;
+      setStatus(label + '…'); setBar(.05 + .6 * i / nChunks);
+      const { blob, rms } = chunkWav(ab, i);
+      if (rms < .002) continue;
+      const d = await api('/api/transcribe?offset=' + (i * CH) + '&lang=' + lang, {
+        method:'POST', headers:{ 'Content-Type':'application/octet-stream' }, body:blob
+      }, label);
+      words.push(...d.words);
+    }
+    if (!words.length) throw new Error('Tidak ada ucapan terdeteksi.');
+    S.tr = { words };
+
+    // jendela transkrip untuk Llama
+    const lines = [];
+    for (let i = 0; i < words.length; i += 10) {
+      const ws = words.slice(i, i + 10);
+      lines.push({ s:ws[0].s, e:ws[ws.length-1].e, t:'[' + Math.round(ws[0].s) + '] ' + ws.map(x => x.w).join(' ') });
+    }
+    const wins = []; let cur = null;
+    for (const l of lines) {
+      if (!cur || l.e - cur.from > 420 || cur.chars > 5500) { cur = { from:l.s, to:l.e, text:[], chars:0 }; wins.push(cur); }
+      cur.text.push(l.t); cur.to = l.e; cur.chars += l.t.length;
+    }
+    let clips = [];
+    S.keys = new Set();
+    for (let i = 0; i < wins.length; i++) {
+      const label = 'Memilih momen ' + (i+1) + '/' + wins.length;
+      setStatus(label + '…'); setBar(.68 + .3 * i / wins.length);
+      const w = wins[i];
+      const d = await api('/api/highlights', {
+        method:'POST', headers:{ 'Content-Type':'application/json' },
+        body:JSON.stringify({ text:w.text.join('\n'), from:w.from, to:w.to })
+      }, label);
+      clips.push(...d.clips);
+      d.keywords.forEach(k => S.keys.add(k));
+      if (i < wins.length - 1) await sleep(2500);
+    }
+    clips.sort((a,b) => b.score - a.score);
+    clips = clips.slice(0, 6);
+    setBar(1);
+    if (!clips.length) { setStatus('Transkrip selesai, tapi AI tidak menemukan momen. Atur klip manual di bawah.', 'err'); return; }
+    setStatus('Selesai. Pilih satu momen di bawah.', 'ok');
+    renderClips(clips);
+    applyClip(clips[0]);
+  } catch(e) {
+    setStatus('Gagal: ' + (e.message || e), 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+function renderClips(clips){
+  const box = $('#clips'); box.innerHTML = '';
+  clips.forEach(c => {
+    const d = document.createElement('div'); d.className = 'clip';
+    const l = document.createElement('div');
+    const b = document.createElement('b'); b.textContent = c.title;
+    const sm = document.createElement('small'); sm.innerHTML = fmt(c.start) + '–' + fmt(c.end) + ' · ' + Math.round(c.end - c.start) + ' dtk · skor <span class="score">' + c.score + '</span>';
+    l.appendChild(b); l.appendChild(sm);
+    const bt = document.createElement('button'); bt.className = 'sm'; bt.textContent = 'Pakai';
+    bt.onclick = () => applyClip(c);
+    d.appendChild(l); d.appendChild(bt); box.appendChild(d);
+  });
+}
+function applyClip(c){
+  S.start = c.start; S.end = c.end; S.auto = true;
+  $('#tStart').value = c.start.toFixed(1); $('#tEnd').value = c.end.toFixed(1);
+  refreshWords(); fillTextFromWords();
+  vid.currentTime = S.start;
+}
+
+/* ---------- event ---------- */
+$('#file').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  if (vid.src) URL.revokeObjectURL(vid.src);
+  vid.src = URL.createObjectURL(f);
+  S.tr = null; S.auto = false; S.keys = new Set(); $('#clips').innerHTML = ''; setStatus(''); setBar(0);
+});
+vid.addEventListener('loadedmetadata', () => {
+  S.start = 0; S.end = Math.min(vid.duration || 30, 45);
+  $('#tStart').value = '0'; $('#tEnd').value = S.end.toFixed(1);
+  vid.currentTime = .01;
+  refreshWords();
+});
+function onTime(){
+  S.start = Math.max(0, parseFloat($('#tStart').value) || 0);
+  S.end = Math.max(S.start + .5, parseFloat($('#tEnd').value) || S.start + 5);
+  refreshWords();
+}
+$('#tStart').addEventListener('input', onTime);
+$('#tEnd').addEventListener('input', onTime);
+$('#btnSetStart').onclick = () => { $('#tStart').value = vid.currentTime.toFixed(1); onTime(); };
+$('#btnSetEnd').onclick = () => { $('#tEnd').value = vid.currentTime.toFixed(1); onTime(); };
+$('#pan').addEventListener('input', e => { S.pan = parseFloat(e.target.value); });
+$('#mode').addEventListener('change', e => { S.mode = e.target.value; });
+$('#txt').addEventListener('input', () => { S.auto = false; refreshWords(); });
+$('#btnSample').onclick = () => {
+  $('#txt').value = 'kita harus BERUBAH sekarang kalau mau hasil yang LEBIH BAIK dan jangan tunggu BESOK';
+  S.auto = false; refreshWords();
+};
+$('#btnPlay').onclick = play;
+$('#btnRec').onclick = startRec;
+$('#btnAuto').onclick = runAuto;
+
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
